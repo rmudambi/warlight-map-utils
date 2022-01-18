@@ -1,1 +1,1 @@
-# warlight-map-utils
+# warzone-map-utils
