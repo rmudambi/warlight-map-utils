@@ -52,3 +52,34 @@ def get_set_territory_name_command(territory_node: ET.Element) -> types.Command:
         'name': territory_name
     }
     return command
+
+
+def get_add_bonus_commands(
+        bonus_link_layer_node: Element, metadata_layer_node: Element
+) -> List[types.Command]:
+    bonus_link_nodes = {
+        node.getAttribute(svg.ID_ATTRIBUTE):
+        node for node in bonus_link_layer_node.getElementsByTagName(svg.PATH_TAG)
+        if svg.BONUS_LINK_IDENTIFIER in node.getAttribute(svg.ID_ATTRIBUTE)
+    }
+    bonus_layer_nodes = [
+        node for node in metadata_layer_node.childNodes
+        if node.getAttribute(svg.LABEL_ATTRIBUTE) == svg.BONUSES_LAYER
+    ][0].getElementsByTagName(svg.GROUP_TAG)
+    # todo create commands
+    for node in bonus_layer_nodes:
+        # todo get bonus name
+        bonus_name = ''
+        # todo get bonus value
+        bonus_value = 0
+        # todo find bonus link node if exists to get color
+        bonus_link_node = bonus_link_nodes[get_bonus_link_id(bonus_name)]
+        # todo create addBonus command
+        pass
+
+    commands = []
+    return commands
+
+
+def get_bonus_link_id(bonus_name: str) -> str:
+    return svg.BONUS_LINK_IDENTIFIER + ''.join(filter(str.isalnum, bonus_name))

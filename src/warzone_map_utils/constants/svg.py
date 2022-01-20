@@ -31,7 +31,7 @@ BONUS_LINK_IDENTIFIER = 'BonusLink_'
 # LAYER CONSTANTS #
 ###################
 
-BACKGROUND_LAYERS = 'background'
+BACKGROUND_LAYERS = 'Background'
 
 BONUS_LINKS_LAYER = 'WZ:BonusLinks'
 
