@@ -1,11 +1,17 @@
+NAMESPACES = {
+    'svg': 'http://www.w3.org/2000/svg',
+    'inkscape': 'http://www.inkscape.org/namespaces/inkscape',
+}
+
+
 #################
 # SVG CONSTANTS #
 #################
 
 ID_ATTRIBUTE = 'id'
-GROUP_TAG = 'g'
-PATH_TAG = 'path'
-
+GROUP_TAG = 'svg:g'
+PATH_TAG = 'svg:path'
+TITLE_TAG = 'svg:title'
 
 ######################
 # INKSCAPE CONSTANTS #
@@ -27,9 +33,9 @@ BONUS_LINK_IDENTIFIER = 'BonusLink_'
 
 BACKGROUND_LAYERS = 'background'
 
-BONUS_LINKS_LAYER = 'bonus-links'
+BONUS_LINKS_LAYER = 'WZ:BonusLinks'
 
 METADATA_LAYER = 'WZ:Metadata'
 BONUSES_LAYER = 'WZ:Bonuses'
 
-TERRITORIES_LAYER = 'territories'
+TERRITORIES_LAYER = 'WZ:Territories'
