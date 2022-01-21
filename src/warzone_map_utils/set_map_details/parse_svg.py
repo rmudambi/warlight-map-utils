@@ -6,23 +6,13 @@ from warzone_map_utils.set_map_details import utilities
 
 
 def get_set_map_details_commands(map_path: str) -> List[types.Command]:
-    layers = get_layers(map_path)
+    layers = utilities.get_layers(map_path)
 
     commands = (
         get_set_territory_name_commands(layers[svg.TERRITORIES_LAYER])
         + get_add_bonus_commands(layers[svg.BONUS_LINKS_LAYER], layers[svg.METADATA_LAYER])
     )
     return commands
-
-
-def get_layers(map_path):
-    map_xml = ET.parse(map_path)
-    root = map_xml.getroot()
-    layers: Dict[str, ET.Element] = {
-        node.get(utilities.get_uri(svg.LABEL_ATTRIBUTE)): node
-        for node in root.findall(f"./*[@{svg.LABEL_ATTRIBUTE}]", svg.NAMESPACES)
-    }
-    return layers
 
 
 def get_set_territory_name_commands(territory_layer_node: ET.Element) -> List[types.Command]:
