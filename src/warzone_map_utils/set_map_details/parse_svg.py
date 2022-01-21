@@ -2,13 +2,7 @@ from typing import Dict, List
 import xml.etree.ElementTree as ET
 
 from warzone_map_utils.constants import svg, types
-
-
-def get_uri(key: str) -> str:
-    if ':' in key:
-        namespace, key = key.split(':')
-        key = f'{{{svg.NAMESPACES[namespace]}}}{key}'
-    return key
+from warzone_map_utils.set_map_details import utilities
 
 
 def get_set_map_details_commands(map_path: str) -> List[types.Command]:
@@ -25,7 +19,7 @@ def get_layers(map_path):
     map_xml = ET.parse(map_path)
     root = map_xml.getroot()
     layers: Dict[str, ET.Element] = {
-        node.get(get_uri(svg.LABEL_ATTRIBUTE)): node
+        node.get(utilities.get_uri(svg.LABEL_ATTRIBUTE)): node
         for node in root.findall(f"./*[@{svg.LABEL_ATTRIBUTE}]", svg.NAMESPACES)
     }
     return layers
@@ -37,27 +31,26 @@ def get_set_territory_name_commands(territory_layer_node: ET.Element) -> List[ty
         if svg.TERRITORY_IDENTIFIER in node.get(svg.ID_ATTRIBUTE)
     ]
 
+    def get_set_territory_name_command(territory_node: ET.Element) -> types.Command:
+        territory_id = int(
+            territory_node.get(svg.ID_ATTRIBUTE)
+            .replace(svg.TERRITORY_IDENTIFIER, '')
+        )
+
+        title_node = territory_node.find(svg.TITLE_TAG, svg.NAMESPACES)
+        territory_name = title_node.text
+        command = {
+            'command': 'setTerritoryName',
+            'id': territory_id,
+            'name': territory_name
+        }
+        return command
+
     commands = [
         get_set_territory_name_command(territory_node) for territory_node in territory_nodes
         if territory_node.find(svg.TITLE_TAG, svg.NAMESPACES) is not None
     ]
     return commands
-
-
-def get_set_territory_name_command(territory_node: ET.Element) -> types.Command:
-    territory_id = int(
-        territory_node.get(svg.ID_ATTRIBUTE)
-        .replace(svg.TERRITORY_IDENTIFIER, '')
-    )
-
-    title_node = territory_node.find(svg.TITLE_TAG, svg.NAMESPACES)
-    territory_name = title_node.text
-    command = {
-        'command': 'setTerritoryName',
-        'id': territory_id,
-        'name': territory_name
-    }
-    return command
 
 
 def get_add_bonus_commands(
@@ -74,33 +67,26 @@ def get_add_bonus_commands(
             f"//{svg.GROUP_TAG}[@{svg.LABEL_ATTRIBUTE}]", svg.NAMESPACES)
     )
 
-    commands = [get_add_bonus_command(node, bonus_link_nodes) for node in bonus_layer_nodes]
-    return commands
+    def get_add_bonus_command(node: ET.Element) -> types.Command:
+        bonus_name, bonus_value = node.get(utilities.get_uri(svg.LABEL_ATTRIBUTE)).split(': ')
 
+        if bonus_link_node := bonus_link_nodes.get(utilities.get_bonus_link_id(bonus_name)):
+            node_style = {
+                key: value for key, value in (
+                    field.split(':') for field in bonus_link_node.get('style').split(';')
+                )
+            }
+            bonus_color = node_style['fill'].upper()
+        else:
+            bonus_color = '#000000'
 
-def get_add_bonus_command(
-        node: ET.Element, bonus_link_nodes: dict[str, ET.Element]
-) -> types.Command:
-    bonus_name, bonus_value = node.get(get_uri(svg.LABEL_ATTRIBUTE)).split(': ')
-
-    if bonus_link_node := bonus_link_nodes.get(get_bonus_link_id(bonus_name)):
-        node_style = {
-            key: value for key, value in (
-                field.split(':') for field in bonus_link_node.get('style').split(';')
-            )
+        command = {
+            'command': 'addBonus',
+            'name': bonus_name,
+            'armies': bonus_value,
+            'color': bonus_color
         }
-        bonus_color = node_style['fill'].upper()
-    else:
-        bonus_color = '#000000'
+        return command
 
-    command = {
-        'command': 'addBonus',
-        'name': bonus_name,
-        'armies': bonus_value,
-        'color': bonus_color
-    }
-    return command
-
-
-def get_bonus_link_id(bonus_name: str) -> str:
-    return svg.BONUS_LINK_IDENTIFIER + ''.join(filter(str.isalnum, bonus_name))
+    commands = [get_add_bonus_command(node) for node in bonus_layer_nodes]
+    return commands
