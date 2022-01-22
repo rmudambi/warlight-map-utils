@@ -14,11 +14,14 @@ def get_layers(map_path: str) -> dict[str, ET.Element]:
     return layers
 
 
-def get_bonus_layers(metadata_layer_node: ET.Element) -> list[ET.Element]:
+def get_metadata_type_layers(
+        metadata_layer_node: ET.Element, metadata_type: str, is_recursive: bool = True
+) -> list[ET.Element]:
+    slash = '//' if is_recursive else '/'
     bonus_layer_nodes = (
         metadata_layer_node.findall(
-            f"./{svg.GROUP_TAG}[@{svg.LABEL_ATTRIBUTE}='{svg.BONUSES_LAYER}']"
-            f"//{svg.GROUP_TAG}[@{svg.LABEL_ATTRIBUTE}]", svg.NAMESPACES)
+            f"./{svg.GROUP_TAG}[@{svg.LABEL_ATTRIBUTE}='{metadata_type}']"
+            f"{slash}{svg.GROUP_TAG}[@{svg.LABEL_ATTRIBUTE}]", svg.NAMESPACES)
     )
     return bonus_layer_nodes
 

@@ -44,5 +44,6 @@ BONUS_LINKS_LAYER = 'WZ:BonusLinks'
 
 METADATA_LAYER = 'WZ:Metadata'
 BONUSES_LAYER = 'WZ:Bonuses'
+DISTRIBUTION_MODES_LAYER = 'WZ:DistributionModes'
 
 TERRITORIES_LAYER = 'WZ:Territories'
