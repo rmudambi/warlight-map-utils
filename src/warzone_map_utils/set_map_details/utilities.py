@@ -1,3 +1,4 @@
+import re
 import xml.etree.ElementTree as ET
 
 from warzone_map_utils.constants import svg
@@ -35,5 +36,5 @@ def get_uri(key: str) -> str:
 
 
 def get_bonus_link_id(bonus_name: str) -> str:
-    return svg.BONUS_LINK_IDENTIFIER + ''.join(filter(str.isalnum, bonus_name))
+    return svg.BONUS_LINK_IDENTIFIER + re.sub(r'[^a-zA-Z0-9]+', '', bonus_name)
 

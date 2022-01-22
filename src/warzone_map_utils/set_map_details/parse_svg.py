@@ -56,7 +56,8 @@ def get_add_bonus_commands(
     def get_add_bonus_command(node: ET.Element) -> types.Command:
         bonus_name, bonus_value = utilities.parse_bonus_layer_label(node)
 
-        if bonus_link_node := bonus_link_nodes.get(utilities.get_bonus_link_id(bonus_name)):
+        bonus_link_node = bonus_link_nodes.get(utilities.get_bonus_link_id(bonus_name))
+        if bonus_link_node is not None:
             node_style = {
                 key: value for key, value in (
                     field.split(':') for field in bonus_link_node.get('style').split(';')
