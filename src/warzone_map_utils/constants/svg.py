@@ -1,6 +1,7 @@
 NAMESPACES = {
     'svg': 'http://www.w3.org/2000/svg',
     'inkscape': 'http://www.inkscape.org/namespaces/inkscape',
+    'xlink': 'http://www.w3.org/1999/xlink',
 }
 
 
@@ -12,6 +13,7 @@ ID_ATTRIBUTE = 'id'
 GROUP_TAG = 'svg:g'
 PATH_TAG = 'svg:path'
 TITLE_TAG = 'svg:title'
+CLONE_TAG = 'svg:use'
 
 ######################
 # INKSCAPE CONSTANTS #
@@ -19,6 +21,11 @@ TITLE_TAG = 'svg:title'
 
 LABEL_ATTRIBUTE = 'inkscape:label'
 
+###################
+# XLINK CONSTANTS #
+###################
+
+HREF_ATTRIBUTE = 'xlink:href'
 
 #####################
 # WARZONE CONSTANTS #

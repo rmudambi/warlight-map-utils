@@ -1,21 +1,21 @@
-from typing import Dict, List
 import xml.etree.ElementTree as ET
 
 from warzone_map_utils.constants import svg, types
 from warzone_map_utils.set_map_details import utilities
 
 
-def get_set_map_details_commands(map_path: str) -> List[types.Command]:
+def get_set_map_details_commands(map_path: str) -> list[types.Command]:
     layers = utilities.get_layers(map_path)
 
     commands = (
         get_set_territory_name_commands(layers[svg.TERRITORIES_LAYER])
         + get_add_bonus_commands(layers[svg.BONUS_LINKS_LAYER], layers[svg.METADATA_LAYER])
+        + get_add_territory_to_bonus_commands(layers[svg.METADATA_LAYER])
     )
     return commands
 
 
-def get_set_territory_name_commands(territory_layer_node: ET.Element) -> List[types.Command]:
+def get_set_territory_name_commands(territory_layer_node: ET.Element) -> list[types.Command]:
     territory_nodes = [
         node for node in territory_layer_node.findall(f"./{svg.PATH_TAG}", svg.NAMESPACES)
         if svg.TERRITORY_IDENTIFIER in node.get(svg.ID_ATTRIBUTE)
@@ -45,20 +45,16 @@ def get_set_territory_name_commands(territory_layer_node: ET.Element) -> List[ty
 
 def get_add_bonus_commands(
         bonus_link_layer_node: ET.Element, metadata_layer_node: ET.Element
-) -> List[types.Command]:
+) -> list[types.Command]:
     bonus_link_nodes = {
         node.get(svg.ID_ATTRIBUTE):
         node for node in bonus_link_layer_node.findall(f"./{svg.PATH_TAG}", svg.NAMESPACES)
         if svg.BONUS_LINK_IDENTIFIER in node.get(svg.ID_ATTRIBUTE)
     }
-    bonus_layer_nodes = (
-        metadata_layer_node.findall(
-            f"./{svg.GROUP_TAG}[@{svg.LABEL_ATTRIBUTE}='{svg.BONUSES_LAYER}']"
-            f"//{svg.GROUP_TAG}[@{svg.LABEL_ATTRIBUTE}]", svg.NAMESPACES)
-    )
+    bonus_layer_nodes = utilities.get_bonus_layers(metadata_layer_node)
 
     def get_add_bonus_command(node: ET.Element) -> types.Command:
-        bonus_name, bonus_value = node.get(utilities.get_uri(svg.LABEL_ATTRIBUTE)).split(': ')
+        bonus_name, bonus_value = utilities.parse_bonus_layer_label(node)
 
         if bonus_link_node := bonus_link_nodes.get(utilities.get_bonus_link_id(bonus_name)):
             node_style = {
@@ -79,4 +75,33 @@ def get_add_bonus_commands(
         return command
 
     commands = [get_add_bonus_command(node) for node in bonus_layer_nodes]
+    return commands
+
+
+def get_add_territory_to_bonus_commands(metadata_layer_node: ET.Element) -> list[types.Command]:
+    bonus_layer_nodes = utilities.get_bonus_layers(metadata_layer_node)
+
+    def get_add_territory_to_bonus_command(
+            territory_node: ET.Element, bonus_node: ET.Element
+    ) -> types.Command:
+        territory_id = (
+            territory_node
+            .get(utilities.get_uri(svg.HREF_ATTRIBUTE))
+            .split(svg.TERRITORY_IDENTIFIER)
+            [-1]
+        )
+        bonus_name, _ = utilities.parse_bonus_layer_label(bonus_node)
+
+        command = {
+            'command': 'addTerritoryToBonus',
+            'id': territory_id,
+            'bonusName': bonus_name
+        }
+        return command
+
+    commands = [
+        get_add_territory_to_bonus_command(territory_node, bonus_node)
+        for bonus_node in bonus_layer_nodes
+        for territory_node in bonus_node.findall(f"./{svg.CLONE_TAG}", svg.NAMESPACES)
+    ]
     return commands
