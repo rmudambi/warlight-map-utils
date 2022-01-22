@@ -12,6 +12,7 @@ def get_set_map_details_commands(map_path: str) -> list[types.Command]:
         + get_add_bonus_commands(layers[svg.BONUS_LINKS_LAYER], layers[svg.METADATA_LAYER])
         + get_add_territory_to_bonus_commands(layers[svg.METADATA_LAYER])
         + get_add_distribution_mode_commands(layers[svg.METADATA_LAYER])
+        + get_add_territory_to_distribution_commands(layers[svg.METADATA_LAYER])
     )
     return commands
 
@@ -86,12 +87,7 @@ def get_add_territory_to_bonus_commands(metadata_layer_node: ET.Element) -> list
     def get_add_territory_to_bonus_command(
             territory_node: ET.Element, bonus_node: ET.Element
     ) -> types.Command:
-        territory_id = (
-            territory_node
-            .get(utilities.get_uri(svg.HREF_ATTRIBUTE))
-            .split(svg.TERRITORY_IDENTIFIER)
-            [-1]
-        )
+        territory_id = utilities.get_territory_id_from_clone(territory_node)
         bonus_name, _ = utilities.parse_bonus_layer_label(bonus_node)
 
         command = {
@@ -127,4 +123,35 @@ def get_add_distribution_mode_commands(metadata_layer_node: ET.Element) -> list[
         return command
 
     commands = [get_add_distribution_mode_command(node) for node in distribution_mode_layer_nodes]
+    return commands
+
+
+def get_add_territory_to_distribution_commands(
+        metadata_layer_node: ET.Element
+) -> list[types.Command]:
+    distribution_mode_layer_nodes = utilities.get_metadata_type_layers(
+        metadata_layer_node, svg.DISTRIBUTION_MODES_LAYER, is_recursive=False
+    )
+
+    def get_add_territory_to_distribution_command(
+            territory_node: ET.Element, distribution_mode_node: ET.Element
+    ) -> types.Command:
+        territory_id = utilities.get_territory_id_from_clone(territory_node)
+        distribution_mode_name = distribution_mode_node.get(utilities.get_uri(svg.LABEL_ATTRIBUTE))
+        # todo implement adding scenario distributions modes
+        #  determine if scenario distribution mode
+        #  get scenario names
+
+        command = {
+            'command': 'addTerritoryToDistribution',
+            'id': territory_id,
+            'distributionName': distribution_mode_name
+        }
+        return command
+
+    commands = [
+        get_add_territory_to_distribution_command(territory_node, distribution_mode_node)
+        for distribution_mode_node in distribution_mode_layer_nodes
+        for territory_node in distribution_mode_node.findall(f"./{svg.CLONE_TAG}", svg.NAMESPACES)
+    ]
     return commands

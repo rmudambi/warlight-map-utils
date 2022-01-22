@@ -26,6 +26,16 @@ def get_metadata_type_layers(
     return bonus_layer_nodes
 
 
+def get_territory_id_from_clone(territory_node: ET.Element) -> int:
+    territory_id = (
+        territory_node
+        .get(get_uri(svg.HREF_ATTRIBUTE))
+        .split(svg.TERRITORY_IDENTIFIER)
+        [-1]
+    )
+    return int(territory_id)
+
+
 def parse_bonus_layer_label(node: ET.Element) -> tuple[str, int]:
     bonus_name, bonus_value = node.get(get_uri(svg.LABEL_ATTRIBUTE)).split(': ')
     return bonus_name, int(bonus_value)
