@@ -1,6 +1,7 @@
 from lxml import etree
 
-from warzone_map_utils.constants import svg, types
+from warzone_map_utils.constants import types
+from warzone_map_utils.constants.svg import Color, Inkscape, Map, Svg, Warzone, NAMESPACES
 from warzone_map_utils.set_map_details import utilities
 
 
@@ -8,28 +9,28 @@ def get_set_map_details_commands(map_path: str) -> list[types.Command]:
     layers = utilities.get_layers(map_path)
 
     commands = (
-        get_set_territory_name_commands(layers[svg.TERRITORIES_LAYER])
-        + get_add_bonus_commands(layers[svg.BONUS_LINKS_LAYER], layers[svg.METADATA_LAYER])
-        + get_add_territory_to_bonus_commands(layers[svg.METADATA_LAYER])
-        + get_add_distribution_mode_commands(layers[svg.METADATA_LAYER])
-        + get_add_territory_to_distribution_commands(layers[svg.METADATA_LAYER])
+        get_set_territory_name_commands(layers[Map.TERRITORIES_LAYER])
+        + get_add_bonus_commands(layers[Map.BONUS_LINKS_LAYER], layers[Map.METADATA_LAYER])
+        + get_add_territory_to_bonus_commands(layers[Map.METADATA_LAYER])
+        + get_add_distribution_mode_commands(layers[Map.METADATA_LAYER])
+        + get_add_territory_to_distribution_commands(layers[Map.METADATA_LAYER])
     )
     return commands
 
 
 def get_set_territory_name_commands(territory_layer_node: etree.Element) -> list[types.Command]:
     territory_nodes = territory_layer_node.xpath(
-        f".//{svg.PATH_TAG}[contains(@{svg.ID}, '{svg.TERRITORY_IDENTIFIER}') and {svg.TITLE_TAG}]",
-        namespaces=svg.NAMESPACES
+        f".//{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}') and {Svg.TITLE}]",
+        namespaces=NAMESPACES
     )
 
     def get_set_territory_name_command(territory_node: etree.Element) -> types.Command:
         territory_id = int(
-            territory_node.get(svg.ID)
-            .replace(svg.TERRITORY_IDENTIFIER, '')
+            territory_node.get(Svg.ID)
+            .replace(Warzone.TERRITORY_IDENTIFIER, '')
         )
 
-        title_node = territory_node.find(svg.TITLE_TAG, svg.NAMESPACES)
+        title_node = territory_node.find(Svg.TITLE, NAMESPACES)
         territory_name = title_node.text
         command = {
             'command': 'setTerritoryName',
@@ -48,12 +49,12 @@ def get_add_bonus_commands(
         bonus_link_layer_node: etree.Element, metadata_layer_node: etree.Element
 ) -> list[types.Command]:
     bonus_link_nodes = {
-        node.get(svg.ID): node for node in bonus_link_layer_node.xpath(
-            f"./{svg.PATH_TAG}[contains(@{svg.ID}, {svg.BONUS_LINK_IDENTIFIER}')]",
-            namespaces=svg.NAMESPACES
+        node.get(Svg.ID): node for node in bonus_link_layer_node.xpath(
+            f"./{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.BONUS_LINK_IDENTIFIER}')]",
+            namespaces=NAMESPACES
         )
     }
-    bonus_layer_nodes = utilities.get_metadata_type_nodes(metadata_layer_node, svg.BONUSES_LAYER)
+    bonus_layer_nodes = utilities.get_metadata_type_nodes(metadata_layer_node, Map.BONUSES_LAYER)
 
     def get_add_bonus_command(node: etree.Element) -> types.Command:
         bonus_name, bonus_value = utilities.parse_bonus_layer_label(node)
@@ -62,13 +63,12 @@ def get_add_bonus_commands(
         if bonus_link_node is not None:
             node_style = {
                 key: value for key, value in (
-                    field.split(':')
-                    for field in bonus_link_node.get(svg.STYLE_ATTRIBUTE).split(';')
+                    field.split(':') for field in bonus_link_node.get(Svg.STYLE).split(';')
                 )
             }
-            bonus_color = node_style[svg.FILL_STYLE].upper()
+            bonus_color = node_style[Svg.FILL].upper()
         else:
-            bonus_color = svg.BLACK_COLOR
+            bonus_color = Color.BLACK
 
         command = {
             'command': 'addBonus',
@@ -83,7 +83,7 @@ def get_add_bonus_commands(
 
 
 def get_add_territory_to_bonus_commands(metadata_layer_node: etree.Element) -> list[types.Command]:
-    bonus_layer_nodes = utilities.get_metadata_type_nodes(metadata_layer_node, svg.BONUSES_LAYER)
+    bonus_layer_nodes = utilities.get_metadata_type_nodes(metadata_layer_node, Map.BONUSES_LAYER)
 
     def get_add_territory_to_bonus_command(
             territory_node: etree.Element, bonus_node: etree.Element
@@ -101,18 +101,18 @@ def get_add_territory_to_bonus_commands(metadata_layer_node: etree.Element) -> l
     commands = [
         get_add_territory_to_bonus_command(territory_node, bonus_node)
         for bonus_node in bonus_layer_nodes
-        for territory_node in bonus_node.xpath(f"./{svg.CLONE_TAG}", namespaces=svg.NAMESPACES)
+        for territory_node in bonus_node.xpath(f"./{Svg.CLONE}", namespaces=NAMESPACES)
     ]
     return commands
 
 
 def get_add_distribution_mode_commands(metadata_layer_node: etree.Element) -> list[types.Command]:
     distribution_mode_layer_nodes = utilities.get_metadata_type_nodes(
-        metadata_layer_node, svg.DISTRIBUTION_MODES_LAYER, is_recursive=False
+        metadata_layer_node, Map.DISTRIBUTION_MODES_LAYER, is_recursive=False
     )
 
     def get_add_distribution_mode_command(distribution_mode_node: etree.Element) -> types.Command:
-        distribution_mode_name = distribution_mode_node.get(utilities.get_uri(svg.LABEL_ATTRIBUTE))
+        distribution_mode_name = distribution_mode_node.get(utilities.get_uri(Inkscape.LABEL))
         # todo implement adding scenario distributions modes
         #  determine if scenario distribution mode
         #  get scenario names
@@ -131,14 +131,14 @@ def get_add_territory_to_distribution_commands(
         metadata_layer_node: etree.Element
 ) -> list[types.Command]:
     distribution_mode_layer_nodes = utilities.get_metadata_type_nodes(
-        metadata_layer_node, svg.DISTRIBUTION_MODES_LAYER, is_recursive=False
+        metadata_layer_node, Map.DISTRIBUTION_MODES_LAYER, is_recursive=False
     )
 
     def get_add_territory_to_distribution_command(
             territory_node: etree.Element, distribution_mode_node: etree.Element
     ) -> types.Command:
         territory_id = utilities.get_territory_id_from_clone(territory_node)
-        distribution_mode_name = distribution_mode_node.get(utilities.get_uri(svg.LABEL_ATTRIBUTE))
+        distribution_mode_name = distribution_mode_node.get(utilities.get_uri(Inkscape.LABEL))
         # todo implement adding scenario distributions modes
         #  determine if scenario distribution mode
         #  get scenario names
@@ -154,7 +154,7 @@ def get_add_territory_to_distribution_commands(
         get_add_territory_to_distribution_command(territory_node, distribution_mode_node)
         for distribution_mode_node in distribution_mode_layer_nodes
         for territory_node in distribution_mode_node.xpath(
-            f"./{svg.CLONE_TAG}", namespaces=svg.NAMESPACES
+            f"./{Svg.CLONE}", namespaces=NAMESPACES
         )
     ]
     return commands

@@ -2,14 +2,14 @@ import re
 
 from lxml import etree
 
-from warzone_map_utils.constants import svg
+from warzone_map_utils.constants.svg import Inkscape, Svg, Warzone, XLink, NAMESPACES
 
 
 def get_layers(map_path: str) -> dict[str, etree.Element]:
     root = etree.parse(map_path)
     layers = {
-        node.get(get_uri(svg.LABEL_ATTRIBUTE)): node
-        for node in root.xpath(f"./*[@{svg.LABEL_ATTRIBUTE}]", namespaces=svg.NAMESPACES)
+        node.get(get_uri(Inkscape.LABEL)): node
+        for node in root.xpath(f"./*[@{Inkscape.LABEL}]", namespaces=NAMESPACES)
     }
     return layers
 
@@ -20,9 +20,9 @@ def get_metadata_type_nodes(
     slash = '//' if is_recursive else '/'
     bonus_layer_nodes = (
         metadata_layer_node.xpath(
-            f"./{svg.GROUP_TAG}[@{svg.LABEL_ATTRIBUTE}='{metadata_type}']"
-            f"{slash}{svg.GROUP_TAG}[@{svg.LABEL_ATTRIBUTE}]",
-            namespaces=svg.NAMESPACES
+            f"./{Svg.GROUP}[@{Inkscape.LABEL}='{metadata_type}']"
+            f"{slash}{Svg.GROUP}[@{Inkscape.LABEL}]",
+            namespaces=NAMESPACES
         )
     )
     return bonus_layer_nodes
@@ -31,25 +31,24 @@ def get_metadata_type_nodes(
 def get_territory_id_from_clone(territory_node: etree.Element) -> int:
     territory_id = (
         territory_node
-        .get(get_uri(svg.HREF_ATTRIBUTE))
-        .split(svg.TERRITORY_IDENTIFIER)
+        .get(get_uri(XLink.HREF))
+        .split(Warzone.TERRITORY_IDENTIFIER)
         [-1]
     )
     return int(territory_id)
 
 
 def parse_bonus_layer_label(node: etree.Element) -> tuple[str, int]:
-    bonus_name, bonus_value = node.get(get_uri(svg.LABEL_ATTRIBUTE)).split(': ')
+    bonus_name, bonus_value = node.get(get_uri(Inkscape.LABEL)).split(': ')
     return bonus_name, int(bonus_value)
 
 
 def get_uri(key: str) -> str:
     if ':' in key:
         namespace, key = key.split(':')
-        key = f'{{{svg.NAMESPACES[namespace]}}}{key}'
+        key = f'{{{NAMESPACES[namespace]}}}{key}'
     return key
 
 
 def get_bonus_link_id(bonus_name: str) -> str:
-    return svg.BONUS_LINK_IDENTIFIER + re.sub(r'[^a-zA-Z0-9]+', '', bonus_name)
-
+    return Warzone.BONUS_LINK_IDENTIFIER + re.sub(r'[^a-zA-Z0-9]+', '', bonus_name)

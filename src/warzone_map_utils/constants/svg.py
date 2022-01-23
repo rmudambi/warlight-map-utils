@@ -9,50 +9,59 @@ NAMESPACES = {
 # SVG CONSTANTS #
 #################
 
-ID = 'id'
-GROUP_TAG = 'svg:g'
-PATH_TAG = 'svg:path'
-TITLE_TAG = 'svg:title'
-CLONE_TAG = 'svg:use'
+class Svg:
+    ID = 'id'
+    GROUP = 'svg:g'
+    PATH = 'svg:path'
+    TITLE = 'svg:title'
+    CLONE = 'svg:use'
 
-STYLE_ATTRIBUTE = 'style'
-FILL_STYLE = 'fill'
+    STYLE = 'style'
+    FILL = 'fill'
+
 
 ######################
 # INKSCAPE CONSTANTS #
 ######################
 
-LABEL_ATTRIBUTE = 'inkscape:label'
+class Inkscape:
+    LABEL = 'inkscape:label'
+
 
 ###################
 # COLOR CONSTANTS #
 ###################
 
-BLACK_COLOR = '#000000'
+class Color:
+    BLACK = '#000000'
+
 
 ###################
 # XLINK CONSTANTS #
 ###################
 
-HREF_ATTRIBUTE = 'xlink:href'
+class XLink:
+    HREF = 'xlink:href'
 
 #####################
 # WARZONE CONSTANTS #
 #####################
 
-TERRITORY_IDENTIFIER = 'Territory_'
-BONUS_LINK_IDENTIFIER = 'BonusLink_'
+
+class Warzone:
+    TERRITORY_IDENTIFIER = 'Territory_'
+    BONUS_LINK_IDENTIFIER = 'BonusLink_'
 
 ###################
 # LAYER CONSTANTS #
 ###################
 
-BACKGROUND_LAYERS = 'Background'
 
-BONUS_LINKS_LAYER = 'WZ:BonusLinks'
+class Map:
+    BONUS_LINKS_LAYER = 'WZ:BonusLinks'
+    TERRITORIES_LAYER = 'WZ:Territories'
+    BACKGROUND_LAYER = 'Background'
 
-METADATA_LAYER = 'WZ:Metadata'
-BONUSES_LAYER = 'WZ:Bonuses'
-DISTRIBUTION_MODES_LAYER = 'WZ:DistributionModes'
-
-TERRITORIES_LAYER = 'WZ:Territories'
+    METADATA_LAYER = 'WZ:Metadata'
+    BONUSES_LAYER = 'WZ:Bonuses'
+    DISTRIBUTION_MODES_LAYER = 'WZ:DistributionModes'
