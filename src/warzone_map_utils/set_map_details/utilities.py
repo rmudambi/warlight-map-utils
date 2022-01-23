@@ -14,7 +14,7 @@ def get_layers(map_path: str) -> dict[str, etree.Element]:
     return layers
 
 
-def get_metadata_type_layers(
+def get_metadata_type_nodes(
         metadata_layer_node: etree.Element, metadata_type: str, is_recursive: bool = True
 ) -> list[etree.Element]:
     slash = '//' if is_recursive else '/'

@@ -18,14 +18,14 @@ def get_set_map_details_commands(map_path: str) -> list[types.Command]:
 
 
 def get_set_territory_name_commands(territory_layer_node: etree.Element) -> list[types.Command]:
-    territory_nodes = [
-        node for node in territory_layer_node.xpath(f"./{svg.PATH_TAG}", namespaces=svg.NAMESPACES)
-        if svg.TERRITORY_IDENTIFIER in node.get(svg.ID_ATTRIBUTE)
-    ]
+    territory_nodes = territory_layer_node.xpath(
+        f".//{svg.PATH_TAG}[contains(@{svg.ID}, '{svg.TERRITORY_IDENTIFIER}') and {svg.TITLE_TAG}]",
+        namespaces=svg.NAMESPACES
+    )
 
     def get_set_territory_name_command(territory_node: etree.Element) -> types.Command:
         territory_id = int(
-            territory_node.get(svg.ID_ATTRIBUTE)
+            territory_node.get(svg.ID)
             .replace(svg.TERRITORY_IDENTIFIER, '')
         )
 
@@ -40,7 +40,6 @@ def get_set_territory_name_commands(territory_layer_node: etree.Element) -> list
 
     commands = [
         get_set_territory_name_command(territory_node) for territory_node in territory_nodes
-        if territory_node.find(svg.TITLE_TAG, svg.NAMESPACES) is not None
     ]
     return commands
 
@@ -49,11 +48,12 @@ def get_add_bonus_commands(
         bonus_link_layer_node: etree.Element, metadata_layer_node: etree.Element
 ) -> list[types.Command]:
     bonus_link_nodes = {
-        node.get(svg.ID_ATTRIBUTE):
-        node for node in bonus_link_layer_node.xpath(f"./{svg.PATH_TAG}", namespaces=svg.NAMESPACES)
-        if svg.BONUS_LINK_IDENTIFIER in node.get(svg.ID_ATTRIBUTE)
+        node.get(svg.ID): node for node in bonus_link_layer_node.xpath(
+            f"./{svg.PATH_TAG}[contains(@{svg.ID}, {svg.BONUS_LINK_IDENTIFIER}')]",
+            namespaces=svg.NAMESPACES
+        )
     }
-    bonus_layer_nodes = utilities.get_metadata_type_layers(metadata_layer_node, svg.BONUSES_LAYER)
+    bonus_layer_nodes = utilities.get_metadata_type_nodes(metadata_layer_node, svg.BONUSES_LAYER)
 
     def get_add_bonus_command(node: etree.Element) -> types.Command:
         bonus_name, bonus_value = utilities.parse_bonus_layer_label(node)
@@ -62,12 +62,13 @@ def get_add_bonus_commands(
         if bonus_link_node is not None:
             node_style = {
                 key: value for key, value in (
-                    field.split(':') for field in bonus_link_node.get('style').split(';')
+                    field.split(':')
+                    for field in bonus_link_node.get(svg.STYLE_ATTRIBUTE).split(';')
                 )
             }
-            bonus_color = node_style['fill'].upper()
+            bonus_color = node_style[svg.FILL_STYLE].upper()
         else:
-            bonus_color = '#000000'
+            bonus_color = svg.BLACK_COLOR
 
         command = {
             'command': 'addBonus',
@@ -82,7 +83,7 @@ def get_add_bonus_commands(
 
 
 def get_add_territory_to_bonus_commands(metadata_layer_node: etree.Element) -> list[types.Command]:
-    bonus_layer_nodes = utilities.get_metadata_type_layers(metadata_layer_node, svg.BONUSES_LAYER)
+    bonus_layer_nodes = utilities.get_metadata_type_nodes(metadata_layer_node, svg.BONUSES_LAYER)
 
     def get_add_territory_to_bonus_command(
             territory_node: etree.Element, bonus_node: etree.Element
@@ -100,13 +101,13 @@ def get_add_territory_to_bonus_commands(metadata_layer_node: etree.Element) -> l
     commands = [
         get_add_territory_to_bonus_command(territory_node, bonus_node)
         for bonus_node in bonus_layer_nodes
-        for territory_node in bonus_node.findall(f"./{svg.CLONE_TAG}", svg.NAMESPACES)
+        for territory_node in bonus_node.xpath(f"./{svg.CLONE_TAG}", namespaces=svg.NAMESPACES)
     ]
     return commands
 
 
 def get_add_distribution_mode_commands(metadata_layer_node: etree.Element) -> list[types.Command]:
-    distribution_mode_layer_nodes = utilities.get_metadata_type_layers(
+    distribution_mode_layer_nodes = utilities.get_metadata_type_nodes(
         metadata_layer_node, svg.DISTRIBUTION_MODES_LAYER, is_recursive=False
     )
 
@@ -129,7 +130,7 @@ def get_add_distribution_mode_commands(metadata_layer_node: etree.Element) -> li
 def get_add_territory_to_distribution_commands(
         metadata_layer_node: etree.Element
 ) -> list[types.Command]:
-    distribution_mode_layer_nodes = utilities.get_metadata_type_layers(
+    distribution_mode_layer_nodes = utilities.get_metadata_type_nodes(
         metadata_layer_node, svg.DISTRIBUTION_MODES_LAYER, is_recursive=False
     )
 

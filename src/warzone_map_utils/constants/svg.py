@@ -9,17 +9,26 @@ NAMESPACES = {
 # SVG CONSTANTS #
 #################
 
-ID_ATTRIBUTE = 'id'
+ID = 'id'
 GROUP_TAG = 'svg:g'
 PATH_TAG = 'svg:path'
 TITLE_TAG = 'svg:title'
 CLONE_TAG = 'svg:use'
+
+STYLE_ATTRIBUTE = 'style'
+FILL_STYLE = 'fill'
 
 ######################
 # INKSCAPE CONSTANTS #
 ######################
 
 LABEL_ATTRIBUTE = 'inkscape:label'
+
+###################
+# COLOR CONSTANTS #
+###################
+
+BLACK_COLOR = '#000000'
 
 ###################
 # XLINK CONSTANTS #
