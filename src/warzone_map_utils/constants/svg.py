@@ -15,6 +15,7 @@ class Svg:
     PATH = 'svg:path'
     TITLE = 'svg:title'
     CLONE = 'svg:use'
+    ELLIPSE = 'svg:ellipse'
 
     STYLE = 'style'
     FILL = 'fill'
@@ -51,6 +52,8 @@ class XLink:
 class Warzone:
     TERRITORY_IDENTIFIER = 'Territory_'
     BONUS_LINK_IDENTIFIER = 'BonusLink_'
+
+    UNNAMED_TERRITORY_NAME = 'Unnamed'
 
 ###################
 # LAYER CONSTANTS #

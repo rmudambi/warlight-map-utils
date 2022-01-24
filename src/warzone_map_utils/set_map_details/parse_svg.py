@@ -10,6 +10,7 @@ def get_set_map_details_commands(map_path: str) -> list[types.Command]:
 
     commands = (
         get_set_territory_name_commands(layers[Map.TERRITORIES_LAYER])
+        + get_set_territory_center_point_commands(layers[Map.TERRITORIES_LAYER])
         + get_add_bonus_commands(layers[Map.BONUS_LINKS_LAYER], layers[Map.METADATA_LAYER])
         + get_add_territory_to_bonus_commands(layers[Map.METADATA_LAYER])
         + get_add_distribution_mode_commands(layers[Map.METADATA_LAYER])
@@ -25,13 +26,8 @@ def get_set_territory_name_commands(territory_layer_node: etree.Element) -> list
     )
 
     def get_set_territory_name_command(territory_node: etree.Element) -> types.Command:
-        territory_id = int(
-            territory_node.get(Svg.ID)
-            .replace(Warzone.TERRITORY_IDENTIFIER, '')
-        )
-
-        title_node = territory_node.find(Svg.TITLE, NAMESPACES)
-        territory_name = title_node.text
+        territory_id = utilities.get_territory_id(territory_node)
+        territory_name = utilities.get_territory_name(territory_node)
         command = {
             'command': 'setTerritoryName',
             'id': territory_id,
@@ -42,6 +38,34 @@ def get_set_territory_name_commands(territory_layer_node: etree.Element) -> list
     commands = [
         get_set_territory_name_command(territory_node) for territory_node in territory_nodes
     ]
+    return commands
+
+
+def get_set_territory_center_point_commands(
+        territory_layer_node: etree.Element
+) -> list[types.Command]:
+    group_nodes = territory_layer_node.xpath(
+        f"./{Svg.GROUP}["
+        f"  {Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}')] and .//{Svg.ELLIPSE}"
+        f"]",
+        namespaces=NAMESPACES
+    )
+
+    def get_set_territory_center_point_command(group_node: etree.Element) -> types.Command:
+        territory_node = group_node.find(f"./{Svg.PATH}", namespaces=NAMESPACES)
+        territory_id = utilities.get_territory_id(territory_node)
+        # todo account for matrix transformations in getting center point
+        center_point_node = group_node.find(f"./{Svg.ELLIPSE}", namespaces=NAMESPACES)
+        x, y = center_point_node.get('cx'), center_point_node.get('cy')
+        command = {
+            'command': 'setTerritoryCenterPoint',
+            'id': territory_id,
+            'x': x,
+            'y': y
+        }
+        return command
+
+    commands = [get_set_territory_center_point_command(group_node) for group_node in group_nodes]
     return commands
 
 
@@ -88,7 +112,7 @@ def get_add_territory_to_bonus_commands(metadata_layer_node: etree.Element) -> l
     def get_add_territory_to_bonus_command(
             territory_node: etree.Element, bonus_node: etree.Element
     ) -> types.Command:
-        territory_id = utilities.get_territory_id_from_clone(territory_node)
+        territory_id = utilities.get_territory_id(territory_node)
         bonus_name, _ = utilities.parse_bonus_layer_label(bonus_node)
 
         command = {
@@ -137,7 +161,7 @@ def get_add_territory_to_distribution_commands(
     def get_add_territory_to_distribution_command(
             territory_node: etree.Element, distribution_mode_node: etree.Element
     ) -> types.Command:
-        territory_id = utilities.get_territory_id_from_clone(territory_node)
+        territory_id = utilities.get_territory_id(territory_node)
         distribution_mode_name = distribution_mode_node.get(utilities.get_uri(Inkscape.LABEL))
         # todo implement adding scenario distributions modes
         #  determine if scenario distribution mode

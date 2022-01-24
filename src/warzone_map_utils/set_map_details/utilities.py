@@ -28,14 +28,29 @@ def get_metadata_type_nodes(
     return bonus_layer_nodes
 
 
-def get_territory_id_from_clone(territory_node: etree.Element) -> int:
-    territory_id = (
-        territory_node
-        .get(get_uri(XLink.HREF))
-        .split(Warzone.TERRITORY_IDENTIFIER)
-        [-1]
-    )
+def get_territory_id(territory_node: etree.Element) -> int:
+    if territory_node.tag == get_uri(Svg.PATH):
+        territory_id = territory_node.get(Svg.ID).replace(Warzone.TERRITORY_IDENTIFIER, '')
+    elif territory_node.tag == get_uri(Svg.CLONE):
+        territory_id = (
+            territory_node
+            .get(get_uri(XLink.HREF))
+            .split(Warzone.TERRITORY_IDENTIFIER)
+            [-1]
+        )
+    else:
+        raise ValueError(f'Element {territory_node} is not a valid territory element. It must be a'
+                         f' path or a clone.')
     return int(territory_id)
+
+
+def get_territory_name(territory_node: etree.Element) -> str:
+    title_node = territory_node.find(Svg.TITLE, NAMESPACES)
+    if title_node is not None:
+        territory_name = title_node.text
+    else:
+        territory_name = Warzone.UNNAMED_TERRITORY_NAME
+    return territory_name
 
 
 def parse_bonus_layer_label(node: etree.Element) -> tuple[str, int]:
