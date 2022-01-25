@@ -27,6 +27,8 @@ class Svg:
 
 class Inkscape:
     LABEL = 'inkscape:label'
+    CONNECTION_START = 'inkscape:connection-start'
+    CONNECTION_END = 'inkscape:connection-end'
 
 
 ###################
@@ -60,11 +62,16 @@ class Warzone:
 ###################
 
 
-class Map:
-    BONUS_LINKS_LAYER = 'WZ:BonusLinks'
-    TERRITORIES_LAYER = 'WZ:Territories'
-    BACKGROUND_LAYER = 'Background'
+class MapLayers:
+    BONUS_LINKS = 'WZ:BonusLinks'
+    TERRITORIES = 'WZ:Territories'
+    BACKGROUND = 'Background'
 
-    METADATA_LAYER = 'WZ:Metadata'
-    BONUSES_LAYER = 'WZ:Bonuses'
-    DISTRIBUTION_MODES_LAYER = 'WZ:DistributionModes'
+    METADATA = 'WZ:Metadata'
+    BONUSES = 'WZ:Bonuses'
+    DISTRIBUTION_MODES = 'WZ:DistributionModes'
+    CONNECTIONS = 'WZ:Connections'
+    NORMAL_CONNECTIONS = 'Normal'
+    WRAP_HORIZONTAL = 'WrapHorizontally'
+    WRAP_VERTICAL = 'WrapVertically'
+

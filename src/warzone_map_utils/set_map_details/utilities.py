@@ -1,4 +1,5 @@
 import re
+from typing import Union
 
 from lxml import etree
 
@@ -28,18 +29,15 @@ def get_metadata_type_nodes(
     return bonus_layer_nodes
 
 
-def get_territory_id(territory_node: etree.Element) -> int:
-    if territory_node.tag == get_uri(Svg.PATH):
-        territory_id = territory_node.get(Svg.ID).replace(Warzone.TERRITORY_IDENTIFIER, '')
-    elif territory_node.tag == get_uri(Svg.CLONE):
-        territory_id = (
-            territory_node
-            .get(get_uri(XLink.HREF))
-            .split(Warzone.TERRITORY_IDENTIFIER)
-            [-1]
-        )
+def get_territory_id(territory: Union[str,  etree.Element]) -> int:
+    if type(territory) == str:
+        territory_id = territory.split(Warzone.TERRITORY_IDENTIFIER)[-1]
+    elif territory.tag == get_uri(Svg.PATH):
+        territory_id = get_territory_id(territory.get(Svg.ID))
+    elif territory.tag == get_uri(Svg.CLONE):
+        territory_id = get_territory_id(territory.get(get_uri(XLink.HREF)))
     else:
-        raise ValueError(f'Element {territory_node} is not a valid territory element. It must be a'
+        raise ValueError(f'Element {territory} is not a valid territory element. It must be a'
                          f' path or a clone.')
     return int(territory_id)
 
