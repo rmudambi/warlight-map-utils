@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+    <_name>Warzone Map Builder</_name>
+    <id>com.warzone.upload_map</id>
+    <label>Load Map Metadata to Warzone</label>
+    <param name="email" type="string" gui-text="Warzone Email Address"/>
+    <param name="api_token" type="string" gui-text="Warzone API Token"/>
+    <param name="map_id" type="int" gui-text="Warzone Map ID"/>
+    <!--  TODO add checkboxes for each type of set details command  -->
+    <effect needs-live-preview="false">
+        <object-type>all</object-type>
+        <effects-menu>
+            <submenu _name="AWarzone"/>
+        </effects-menu>
+    </effect>
+    <script>
+        <command reldir="extensions" interpreter="python">warzone_map_builder.py</command>
+    </script>
+</inkscape-extension>
