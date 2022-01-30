@@ -131,8 +131,11 @@ class WZMapBuilder(EffectExtension):
 
     def _get_set_territory_name_commands(self) -> List[Command]:
         """
-        Parses svg and creates a setTerritoryName command for each path whose ID signifies it is a
-        Warzone Territory (i.e. starts with the Warzone.TERRITORY_IDENTIFIER) and also has a title.
+        Parses svg and creates setTerritoryName commands.
+
+        A command for each path whose ID signifies it is a Warzone Territory (i.e. starts with the
+        Warzone.TERRITORY_IDENTIFIER) and also has a title.
+
         :return:
         List of setTerritoryNameCommands
         """
@@ -152,11 +155,15 @@ class WZMapBuilder(EffectExtension):
 
     def _get_add_bonus_commands(self) -> List[Command]:
         """
-        Parses svg and creates an addBonus command for each sub-layer of the WZ:Bonuses layer. Each
-        of these sub-layers is assumed to have a name of the form `bonus_name: bonus_value`. If a
-        path node exists with the id f"{Warzone.BONUS_IDENTIFIER}bonus_name" the fill color of that
-        path is used as the bonus color, otherwise the bonus color is black.
+        Parses svg and creates addBonus commands.
+
+        A command is created for each sub-layer of the WZ:Bonuses layer. Each of these sub-layers is
+        assumed to have a name of the form `bonus_name: bonus_value`. If a path node exists with the
+        id f"{Warzone.BONUS_IDENTIFIER}bonus_name" the fill color of that path is used as the bonus
+        color, otherwise the bonus color is black.
+
         :return:
+        List of addBonus commands
         """
         bonus_links: Dict[str, PathElement] = {
             bonus_link.get(Svg.ID): bonus_link
@@ -188,6 +195,17 @@ class WZMapBuilder(EffectExtension):
         return commands
 
     def _get_add_territory_to_bonus_commands(self) -> List[Command]:
+        """
+        Parses svg and creates addTerritoryToBonus commands.
+
+        Each sub-layer of the WZ:Bonuses layer is assumed to contain clones of Territory nodes (i.e.
+        path nodes whose id starts with Warzone.TERRITORY_IDENTIFIER). A command is created for the
+        linked territory of each clone in each of these sub-layers adding that territory to the
+        bonus of the layer it is in.
+
+        :return:
+        List of addTerritoryToBonus commands
+        """
         bonus_layers = self._get_metadata_type_layers(MapLayers.BONUSES)
         commands = [
             {
@@ -200,6 +218,15 @@ class WZMapBuilder(EffectExtension):
         return commands
 
     def _get_add_distribution_mode_commands(self) -> List[Command]:
+        """
+        Parses svg and creates addDistributionMode commands.
+
+        A command is created for each sub-layer of the WZ:DistributionModes layer. Each of these
+        sub-layers should be named with the name of the distribution mode.
+
+        :return:
+        List of addDistributionMode commands
+        """
         distribution_mode_layers = self._get_metadata_type_layers(
             MapLayers.DISTRIBUTION_MODES, is_recursive=False
         )
@@ -213,6 +240,17 @@ class WZMapBuilder(EffectExtension):
         return commands
 
     def _get_add_territory_to_distribution_commands(self) -> List[Command]:
+        """
+        Parses svg and creates addTerritoryToDistribution commands.
+
+        Each sub-layer of the WZ:DistributionModes layer is assumed to contain clones of Territory
+        nodes (i.e. path nodes whose id starts with Warzone.TERRITORY_IDENTIFIER). A command is
+        created for the linked territory of each clone in each of these sub-layers adding that
+        territory to the distribution mode of the layer it is in.
+
+        :return:
+        List of addTerritoryToDistribution commands
+        """
         distribution_mode_layers = self._get_metadata_type_layers(
             MapLayers.DISTRIBUTION_MODES, is_recursive=False
         )
