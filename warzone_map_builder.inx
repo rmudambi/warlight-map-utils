@@ -5,7 +5,7 @@
     <label>Load Map Metadata to Warzone</label>
     <param name="email" type="string" gui-text="Warzone Email Address"/>
     <param name="api_token" type="string" gui-text="Warzone API Token"/>
-    <param name="map_id" type="int" gui-text="Warzone Map ID"/>
+    <param name="map_id" type="int" min="0" max="9999999" gui-text="Warzone Map ID"/>
     <!--  TODO add checkboxes for each type of set details command  -->
     <effect needs-live-preview="false">
         <object-type>all</object-type>
