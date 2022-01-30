@@ -1,1 +1,0 @@
-from warzone_map_utils.set_map_details.parse_svg import get_set_map_details_commands

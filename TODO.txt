@@ -1,0 +1,21 @@
+Set default center point using https://blog.mapbox.com/a-new-algorithm-for-finding-a-visual-center-of-a-polygon-7c77e6492fbc
+Implement scenario distributions
+Create bonus layers and links from the extension
+    input name and value and select territories
+    checkbox to signify that link should be visible
+Create connection layer entries from the extension
+    select a pair of territories
+    drop-down for type of connection
+Set territory center point from the extension
+    select an ellipse and a territory
+    option to reset default
+Create distribution mode layers from the extension
+    input name and if is scenario distribution add scenario name
+    select territories to add to distribution
+Create INSS bonus layers from the extension
+    input key-value pairs for # of territories and income
+    select bonus link for the super-bonus to get territories and name
+Create bonus layers for Earthsea
+    input key-value pairs for # of territories and income
+    select bonus link for the super-bonus to get territories
+    select island to get key territory

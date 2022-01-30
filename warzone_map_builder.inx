@@ -16,7 +16,7 @@
     <effect needs-live-preview="false">
         <object-type>all</object-type>
         <effects-menu>
-            <submenu _name="AWarzone"/>
+            <submenu _name="Export"/>
         </effects-menu>
     </effect>
     <script>
