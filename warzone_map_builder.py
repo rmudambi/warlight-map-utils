@@ -6,7 +6,7 @@ import re
 import requests
 from typing import Dict, List, Tuple, Union
 
-from inkex import BaseElement, Boolean, EffectExtension, Group, PathElement
+from inkex import BaseElement, Boolean, EffectExtension, Group, PathElement, Use
 from inkex.utils import debug
 
 
@@ -116,6 +116,8 @@ class WZMapBuilder(EffectExtension):
             commands += self._get_set_territory_name_commands()
         if self.options.bonuses:
             commands += self._get_add_bonus_commands()
+        if self.options.territory_bonuses:
+            commands += self._get_add_territory_to_bonus_commands()
         # todo add the rest of the commands
         return commands
 
@@ -177,17 +179,29 @@ class WZMapBuilder(EffectExtension):
 
         return commands
 
+    def _get_add_territory_to_bonus_commands(self) -> List[Command]:
+        bonus_layer_nodes = self._get_metadata_type_nodes(MapLayers.BONUSES)
+        commands = [
+            {
+                'command': 'addTerritoryToBonus',
+                'id': self._get_territory_id(territory_node),
+                'bonusName': self._parse_bonus_layer_label(bonus_node)[0]
+            } for bonus_node in bonus_layer_nodes
+            for territory_node in bonus_node.xpath(f"./{Svg.CLONE}", namespaces=NAMESPACES)
+        ]
+        return commands
+
     #################
     # PARSING UTILS #
     #################
 
     @staticmethod
-    def _get_territory_id(territory: Union[str,  BaseElement]) -> int:
+    def _get_territory_id(territory: Union[str,  PathElement, Use]) -> int:
         if isinstance(territory, str):
             territory_id = territory.split(Warzone.TERRITORY_IDENTIFIER)[-1]
         elif isinstance(territory, PathElement):
             territory_id = WZMapBuilder._get_territory_id(territory.get(Svg.ID))
-        elif territory.tag == get_uri(Svg.CLONE):
+        elif isinstance(territory, Use):
             territory_id = WZMapBuilder._get_territory_id(territory.get(get_uri(XLink.HREF)))
         else:
             raise ValueError(f'Element {territory} is not a valid territory element. It must be a'
