@@ -5,7 +5,7 @@ import json
 import requests
 from typing import Dict, List, Union
 
-from inkex import BaseElement, EffectExtension, PathElement
+from inkex import BaseElement, Boolean, EffectExtension, PathElement
 from inkex.utils import debug
 
 
@@ -75,18 +75,18 @@ class WZMapBuilder(EffectExtension):
         pars.add_argument("--api_token", type=str, default='')
         pars.add_argument("--map_id", type=int)
         # TODO add checkboxes for each type of set details command
+        pars.add_argument("--territory_names", type=Boolean, default=False)
+        pars.add_argument("--territory_center_points", type=Boolean, default=False)
+        pars.add_argument("--connections", type=Boolean, default=False)
+        pars.add_argument("--bonuses", type=Boolean, default=False)
+        pars.add_argument("--territory_bonuses", type=Boolean, default=False)
+        pars.add_argument("--distribution_modes", type=Boolean, default=False)
+        pars.add_argument("--territory_distribution_modes", type=Boolean, default=False)
 
     def effect(self):
-        # selected_object = self.svg.selected[self.options.ids[0]]
-        # # 2 get type of the selected object
-        # typeOfSelectedObject = selected_object.tag
-        # # 3 Display the type
-        # inkex.utils.debug("I am a: ")
-        # inkex.utils.debug(typeOfSelectedObject)
-        # inkex.utils.debug(" !\n")
-
         commands = self._get_commands()
         # todo uncomment when ready to POST
+        debug(self.options)
         self._post_map_details(commands)
         return
 
@@ -110,8 +110,7 @@ class WZMapBuilder(EffectExtension):
     def _get_commands(self) -> List[Command]:
         commands = []
 
-        # todo add check for whether to include this command type
-        if True:
+        if self.options.territory_names:
             commands += self._get_set_territory_name_commands()
         # todo add the rest of the commands
         return commands
