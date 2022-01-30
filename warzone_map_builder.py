@@ -115,7 +115,8 @@ class WZMapBuilder(EffectExtension):
             commands += self._get_set_territory_name_commands()
         if self.options.territory_center_points:
             commands += self._get_set_territory_center_point_commands()
-        # todo add connections
+        if self.options.connections:
+            commands += self._get_add_territory_connections_commands()
         if self.options.bonuses:
             commands += self._get_add_bonus_commands()
         if self.options.territory_bonuses:
@@ -180,6 +181,36 @@ class WZMapBuilder(EffectExtension):
                 'y': y
             }
             commands.append(command)
+
+        return commands
+
+    def _get_add_territory_connections_commands(self) -> List[Command]:
+        connection_type_layers = self._get_metadata_type_layers(MapLayers.CONNECTIONS)
+
+        commands = []
+        for connection_type_layer in connection_type_layers:
+            for connection_layer in connection_type_layer:
+                def get_territory_id(attribute: str) -> int:
+                    link_id = connection_layer.get(get_uri(attribute))[1:]
+                    # todo handle top-level territories
+                    #  - currently only works if territory node is one layer below linked node
+                    #  - probably want to separate center point from group and key on that
+                    #  - possible solution (likely most user friendly) is to automatically detect
+                    #       which territory a center point corresponds with
+                    territory = self.svg.xpath(
+                        f".//*[@{Svg.ID}='{link_id}']"
+                        f"/{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}')]",
+                        namespaces=NAMESPACES
+                    )[0]
+                    return self._get_territory_id(territory.get(Svg.ID))
+
+                command = {
+                    'command': 'addTerritoryConnection',
+                    'id1': get_territory_id(Inkscape.CONNECTION_START),
+                    'id2': get_territory_id(Inkscape.CONNECTION_END),
+                    'wrap': connection_type_layer.get(get_uri(Inkscape.LABEL))
+                }
+                commands.append(command)
 
         return commands
 
