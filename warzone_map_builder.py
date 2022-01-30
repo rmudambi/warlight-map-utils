@@ -6,7 +6,7 @@ import re
 import requests
 from typing import Dict, List, Tuple, Union
 
-from inkex import Boolean, EffectExtension, Group, PathElement, Use
+from inkex import Boolean, Ellipse, EffectExtension, Group, PathElement, Use
 from inkex.utils import debug
 
 
@@ -113,7 +113,8 @@ class WZMapBuilder(EffectExtension):
         commands = []
         if self.options.territory_names:
             commands += self._get_set_territory_name_commands()
-        # todo add set center points
+        if self.options.territory_center_points:
+            commands += self._get_set_territory_center_point_commands()
         # todo add connections
         if self.options.bonuses:
             commands += self._get_add_bonus_commands()
@@ -151,6 +152,35 @@ class WZMapBuilder(EffectExtension):
                 'name': self._get_territory_name(territory)
             } for territory in territories
         ]
+        return commands
+
+    def _get_set_territory_center_point_commands(self) -> List[Command]:
+        groups = self.svg.xpath(
+            f".//{Svg.GROUP}["
+            f"  {Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}')]"
+            f"  and .//{Svg.ELLIPSE}"
+            f"]",
+            namespaces=NAMESPACES
+        )
+
+        # todo use https://blog.mapbox.com/a-new-algorithm-for-finding-a-visual-center-of-a-polygon-7c77e6492fbc
+        #  to set a default center point
+
+        commands = []
+        for group in groups:
+            territory = group.find(f"./{Svg.PATH}", namespaces=NAMESPACES)
+            territory_id = self._get_territory_id(territory)
+            # todo account for matrix transformations in getting center point
+            center_ellipse: Ellipse = group.find(f"./{Svg.ELLIPSE}", namespaces=NAMESPACES)
+            x, y = center_ellipse.center
+            command = {
+                'command': 'setTerritoryCenterPoint',
+                'id': territory_id,
+                'x': x,
+                'y': y
+            }
+            commands.append(command)
+
         return commands
 
     def _get_add_bonus_commands(self) -> List[Command]:
@@ -230,6 +260,9 @@ class WZMapBuilder(EffectExtension):
         distribution_mode_layers = self._get_metadata_type_layers(
             MapLayers.DISTRIBUTION_MODES, is_recursive=False
         )
+        # todo implement adding scenario distributions modes
+        #  determine if scenario distribution mode
+        #  get scenario names
 
         commands = [
             {
@@ -254,6 +287,9 @@ class WZMapBuilder(EffectExtension):
         distribution_mode_layers = self._get_metadata_type_layers(
             MapLayers.DISTRIBUTION_MODES, is_recursive=False
         )
+        # todo implement adding scenario distributions modes
+        #  determine if scenario distribution mode
+        #  get scenario names
 
         commands = [
             {
