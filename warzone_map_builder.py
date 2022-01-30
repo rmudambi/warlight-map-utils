@@ -2,10 +2,11 @@
 
 from argparse import ArgumentParser
 import json
+import re
 import requests
-from typing import Dict, List, Union
+from typing import Dict, List, Tuple, Union
 
-from inkex import BaseElement, Boolean, EffectExtension, PathElement
+from inkex import BaseElement, Boolean, EffectExtension, Group, PathElement
 from inkex.utils import debug
 
 
@@ -62,6 +63,10 @@ class MapLayers:
     WRAP_VERTICAL = 'WrapVertically'
 
 
+class Color:
+    BLACK = '#000000'
+
+
 class Warzone:
     TERRITORY_IDENTIFIER = 'Territory_'
     BONUS_LINK_IDENTIFIER = 'BonusLink_'
@@ -74,7 +79,6 @@ class WZMapBuilder(EffectExtension):
         pars.add_argument("--email", type=str, default='')
         pars.add_argument("--api_token", type=str, default='')
         pars.add_argument("--map_id", type=int)
-        # TODO add checkboxes for each type of set details command
         pars.add_argument("--territory_names", type=Boolean, default=False)
         pars.add_argument("--territory_center_points", type=Boolean, default=False)
         pars.add_argument("--connections", type=Boolean, default=False)
@@ -85,8 +89,6 @@ class WZMapBuilder(EffectExtension):
 
     def effect(self):
         commands = self._get_commands()
-        # todo uncomment when ready to POST
-        debug(self.options)
         self._post_map_details(commands)
         return
 
@@ -112,12 +114,14 @@ class WZMapBuilder(EffectExtension):
 
         if self.options.territory_names:
             commands += self._get_set_territory_name_commands()
+        if self.options.bonuses:
+            commands += self._get_add_bonus_commands()
         # todo add the rest of the commands
         return commands
 
     def _get_set_territory_name_commands(self) -> List[Command]:
         """
-        Parses svg and creates a setTerritoryNameCommand for each path whose ID signifies it is a
+        Parses svg and creates a setTerritoryName command for each path whose ID signifies it is a
         Warzone Territory (i.e. starts with the Warzone.TERRITORY_IDENTIFIER) and also has a title.
         :return:
         List of setTerritoryNameCommands
@@ -134,6 +138,43 @@ class WZMapBuilder(EffectExtension):
                 'name': self._get_territory_name(territory_node)
             } for territory_node in territory_nodes
         ]
+        return commands
+
+    def _get_add_bonus_commands(self) -> List[Command]:
+        """
+        Parses svg and creates an addBonus command for each sub-layer of the WZ:Bonuses layer. Each
+        of these sub-layers is assumed to have a name of the form `bonus_name: bonus_value`. If a
+        path node exists with the id f"{Warzone.BONUS_IDENTIFIER}bonus_name" the fill color of that
+        path is used as the bonus color, otherwise the bonus color is black.
+        :return:
+        """
+        bonus_link_nodes: Dict[str, PathElement] = {
+            node.get(Svg.ID): node
+            for node in self.svg.xpath(
+                f".//{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.BONUS_LINK_IDENTIFIER}')]",
+                namespaces=NAMESPACES
+            )
+        }
+        bonus_layer_nodes = self._get_metadata_type_nodes(MapLayers.BONUSES)
+
+        commands = []
+        for node in bonus_layer_nodes:
+            bonus_name, bonus_value = self._parse_bonus_layer_label(node)
+            bonus_link_node = bonus_link_nodes.get(self._get_bonus_link_id(bonus_name))
+            if bonus_link_node is not None:
+                node_style = bonus_link_node.composed_style()
+                bonus_color = node_style[Svg.FILL].upper()
+            else:
+                bonus_color = Color.BLACK
+
+            command = {
+                'command': 'addBonus',
+                'name': bonus_name,
+                'armies': bonus_value,
+                'color': bonus_color
+            }
+            commands.append(command)
+
         return commands
 
     #################
@@ -161,6 +202,27 @@ class WZMapBuilder(EffectExtension):
         else:
             territory_name = Warzone.UNNAMED_TERRITORY_NAME
         return territory_name
+
+    def _get_metadata_type_nodes(
+            self, metadata_type: str, is_recursive: bool = True
+    ) -> List[Group]:
+        slash = '//' if is_recursive else '/'
+        bonus_layer_nodes = self.svg.xpath(
+            f"./{Svg.GROUP}[@{Inkscape.LABEL}='{MapLayers.METADATA}']"
+            f"/{Svg.GROUP}[@{Inkscape.LABEL}='{metadata_type}']"
+            f"{slash}{Svg.GROUP}[@{Inkscape.LABEL}]",
+            namespaces=NAMESPACES
+        )
+        return bonus_layer_nodes
+
+    @staticmethod
+    def _parse_bonus_layer_label(node: BaseElement) -> Tuple[str, int]:
+        bonus_name, bonus_value = node.get(get_uri(Inkscape.LABEL)).split(': ')
+        return bonus_name, int(bonus_value)
+
+    @staticmethod
+    def _get_bonus_link_id(bonus_name: str) -> str:
+        return Warzone.BONUS_LINK_IDENTIFIER + re.sub(r'[^a-zA-Z0-9]+', '', bonus_name)
 
 
 WZMapBuilder().run()
