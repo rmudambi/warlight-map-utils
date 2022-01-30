@@ -6,7 +6,7 @@ import re
 import requests
 from typing import Dict, List, Tuple, Union
 
-from inkex import BaseElement, Boolean, EffectExtension, Group, PathElement, Use
+from inkex import Boolean, EffectExtension, Group, PathElement, Use
 from inkex.utils import debug
 
 
@@ -113,13 +113,16 @@ class WZMapBuilder(EffectExtension):
         commands = []
         if self.options.territory_names:
             commands += self._get_set_territory_name_commands()
+        # todo add set center points
+        # todo add connections
         if self.options.bonuses:
             commands += self._get_add_bonus_commands()
         if self.options.territory_bonuses:
             commands += self._get_add_territory_to_bonus_commands()
         if self.options.distribution_modes:
             commands += self._get_add_distribution_mode_commands()
-        # todo add the rest of the commands
+        if self.options.territory_distribution_modes:
+            commands += self._get_add_territory_to_distribution_commands()
         return commands
 
     ###################
@@ -133,7 +136,7 @@ class WZMapBuilder(EffectExtension):
         :return:
         List of setTerritoryNameCommands
         """
-        territory_nodes = self.svg.xpath(
+        territories = self.svg.xpath(
             f".//{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}') and {Svg.TITLE}]",
             namespaces=NAMESPACES
         )
@@ -141,9 +144,9 @@ class WZMapBuilder(EffectExtension):
         commands = [
             {
                 'command': 'setTerritoryName',
-                'id': self._get_territory_id(territory_node),
-                'name': self._get_territory_name(territory_node)
-            } for territory_node in territory_nodes
+                'id': self._get_territory_id(territory),
+                'name': self._get_territory_name(territory)
+            } for territory in territories
         ]
         return commands
 
@@ -155,19 +158,19 @@ class WZMapBuilder(EffectExtension):
         path is used as the bonus color, otherwise the bonus color is black.
         :return:
         """
-        bonus_link_nodes: Dict[str, PathElement] = {
-            node.get(Svg.ID): node
-            for node in self.svg.xpath(
+        bonus_links: Dict[str, PathElement] = {
+            bonus_link.get(Svg.ID): bonus_link
+            for bonus_link in self.svg.xpath(
                 f".//{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.BONUS_LINK_IDENTIFIER}')]",
                 namespaces=NAMESPACES
             )
         }
-        bonus_layer_nodes = self._get_metadata_type_nodes(MapLayers.BONUSES)
+        bonus_layer_nodes = self._get_metadata_type_layers(MapLayers.BONUSES)
 
         commands = []
-        for node in bonus_layer_nodes:
-            bonus_name, bonus_value = self._parse_bonus_layer_label(node)
-            bonus_link_node = bonus_link_nodes.get(self._get_bonus_link_id(bonus_name))
+        for bonus_layer in bonus_layer_nodes:
+            bonus_name, bonus_value = self._parse_bonus_layer_label(bonus_layer)
+            bonus_link_node = bonus_links.get(self._get_bonus_link_id(bonus_name))
             if bonus_link_node is not None:
                 node_style = bonus_link_node.composed_style()
                 bonus_color = node_style[Svg.FILL].upper()
@@ -185,27 +188,42 @@ class WZMapBuilder(EffectExtension):
         return commands
 
     def _get_add_territory_to_bonus_commands(self) -> List[Command]:
-        bonus_layer_nodes = self._get_metadata_type_nodes(MapLayers.BONUSES)
+        bonus_layers = self._get_metadata_type_layers(MapLayers.BONUSES)
         commands = [
             {
                 'command': 'addTerritoryToBonus',
-                'id': self._get_territory_id(territory_node),
-                'bonusName': self._parse_bonus_layer_label(bonus_node)[0]
-            } for bonus_node in bonus_layer_nodes
-            for territory_node in bonus_node.xpath(f"./{Svg.CLONE}", namespaces=NAMESPACES)
+                'id': self._get_territory_id(territory),
+                'bonusName': self._parse_bonus_layer_label(bonus_layer)[0]
+            } for bonus_layer in bonus_layers
+            for territory in bonus_layer.xpath(f"./{Svg.CLONE}", namespaces=NAMESPACES)
         ]
         return commands
 
     def _get_add_distribution_mode_commands(self) -> List[Command]:
-        distribution_mode_layer_nodes = self._get_metadata_type_nodes(
+        distribution_mode_layers = self._get_metadata_type_layers(
             MapLayers.DISTRIBUTION_MODES, is_recursive=False
         )
 
         commands = [
             {
                 'command': 'addDistributionMode',
-                'name': node.get(get_uri(Inkscape.LABEL)),
-            } for node in distribution_mode_layer_nodes
+                'name': distribution_mode_layer.get(get_uri(Inkscape.LABEL)),
+            } for distribution_mode_layer in distribution_mode_layers
+        ]
+        return commands
+
+    def _get_add_territory_to_distribution_commands(self) -> List[Command]:
+        distribution_mode_layers = self._get_metadata_type_layers(
+            MapLayers.DISTRIBUTION_MODES, is_recursive=False
+        )
+
+        commands = [
+            {
+                'command': 'addTerritoryToDistribution',
+                'id': self._get_territory_id(territory),
+                'distributionName': distribution_mode_layer.get(get_uri(Inkscape.LABEL))
+            } for distribution_mode_layer in distribution_mode_layers
+            for territory in distribution_mode_layer.xpath(f"./{Svg.CLONE}", namespaces=NAMESPACES)
         ]
         return commands
 
@@ -227,29 +245,29 @@ class WZMapBuilder(EffectExtension):
         return int(territory_id)
 
     @staticmethod
-    def _get_territory_name(territory_node: PathElement) -> str:
-        title_node = territory_node.find(Svg.TITLE, NAMESPACES)
-        if title_node is not None:
-            territory_name = title_node.text
+    def _get_territory_name(territory: PathElement) -> str:
+        title = territory.find(Svg.TITLE, NAMESPACES)
+        if title is not None:
+            territory_name = title.text
         else:
             territory_name = Warzone.UNNAMED_TERRITORY_NAME
         return territory_name
 
-    def _get_metadata_type_nodes(
+    def _get_metadata_type_layers(
             self, metadata_type: str, is_recursive: bool = True
     ) -> List[Group]:
         slash = '//' if is_recursive else '/'
-        bonus_layer_nodes = self.svg.xpath(
+        bonus_layers = self.svg.xpath(
             f"./{Svg.GROUP}[@{Inkscape.LABEL}='{MapLayers.METADATA}']"
             f"/{Svg.GROUP}[@{Inkscape.LABEL}='{metadata_type}']"
             f"{slash}{Svg.GROUP}[@{Inkscape.LABEL}]",
             namespaces=NAMESPACES
         )
-        return bonus_layer_nodes
+        return bonus_layers
 
     @staticmethod
-    def _parse_bonus_layer_label(node: BaseElement) -> Tuple[str, int]:
-        bonus_name, bonus_value = node.get(get_uri(Inkscape.LABEL)).split(': ')
+    def _parse_bonus_layer_label(bonus_layer: Group) -> Tuple[str, int]:
+        bonus_name, bonus_value = bonus_layer.get(get_uri(Inkscape.LABEL)).split(': ')
         return bonus_name, int(bonus_value)
 
     @staticmethod
