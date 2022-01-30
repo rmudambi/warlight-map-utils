@@ -111,15 +111,20 @@ class WZMapBuilder(EffectExtension):
 
     def _get_commands(self) -> List[Command]:
         commands = []
-
         if self.options.territory_names:
             commands += self._get_set_territory_name_commands()
         if self.options.bonuses:
             commands += self._get_add_bonus_commands()
         if self.options.territory_bonuses:
             commands += self._get_add_territory_to_bonus_commands()
+        if self.options.distribution_modes:
+            commands += self._get_add_distribution_mode_commands()
         # todo add the rest of the commands
         return commands
+
+    ###################
+    # COMMAND GETTERS #
+    ###################
 
     def _get_set_territory_name_commands(self) -> List[Command]:
         """
@@ -188,6 +193,19 @@ class WZMapBuilder(EffectExtension):
                 'bonusName': self._parse_bonus_layer_label(bonus_node)[0]
             } for bonus_node in bonus_layer_nodes
             for territory_node in bonus_node.xpath(f"./{Svg.CLONE}", namespaces=NAMESPACES)
+        ]
+        return commands
+
+    def _get_add_distribution_mode_commands(self) -> List[Command]:
+        distribution_mode_layer_nodes = self._get_metadata_type_nodes(
+            MapLayers.DISTRIBUTION_MODES, is_recursive=False
+        )
+
+        commands = [
+            {
+                'command': 'addDistributionMode',
+                'name': node.get(get_uri(Inkscape.LABEL)),
+            } for node in distribution_mode_layer_nodes
         ]
         return commands
 
