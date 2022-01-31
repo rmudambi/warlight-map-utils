@@ -2,17 +2,25 @@
 <inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
     <_name>Warzone Map Builder</_name>
     <id>com.warzone.upload_map</id>
-    <label>Load Map Metadata to Warzone</label>
-    <param name="email" type="string" gui-text="Warzone Email Address"/>
-    <param name="api_token" type="string" gui-text="Warzone API Token"/>
-    <param name="map_id" type="int" min="0" max="9999999" gui-text="Warzone Map ID"/>
-    <param name="territory_names" type="bool" gui-text="Set Territory Names">False</param>
-    <param name="territory_center_points" type="bool" gui-text="Set Territory Center Points">false</param>
-    <param name="connections" type="bool" gui-text="Set Connections">false</param>
-    <param name="bonuses" type="bool" gui-text="Add Bonuses">false</param>
-    <param name="territory_bonuses" type="bool" gui-text="Add Territories to Bonuses">false</param>
-    <param name="distribution_modes" type="bool" gui-text="Add Distribution Modes">false</param>
-    <param name="territory_distribution_modes" type="bool" gui-text="Add Territories to Distribution Modes">false</param>
+    <param name="tab" type="notebook">
+        <page name="territory-ids" gui-text="Territory IDs">
+            <label appearance="header">Set Territory IDs for Selected Paths</label>
+            <!--     todo add help text       -->
+        </page>
+        <page name="upload" gui-text="Upload metadata to Warzone">
+            <label appearance="header">Load Map Metadata to Warzone</label>
+            <param name="email" type="string" gui-text="Warzone Email Address"/>
+            <param name="api_token" type="string" gui-text="Warzone API Token"/>
+            <param name="map_id" type="int" min="0" max="9999999" gui-text="Warzone Map ID"/>
+            <param name="territory_names" type="bool" gui-text="Set Territory Names">false</param>
+            <param name="territory_center_points" type="bool" gui-text="Set Territory Center Points">false</param>
+            <param name="connections" type="bool" gui-text="Set Connections">false</param>
+            <param name="bonuses" type="bool" gui-text="Add Bonuses">false</param>
+            <param name="territory_bonuses" type="bool" gui-text="Add Territories to Bonuses">false</param>
+            <param name="distribution_modes" type="bool" gui-text="Add Distribution Modes">false</param>
+            <param name="territory_distribution_modes" type="bool" gui-text="Add Territories to Distribution Modes">false</param>
+        </page>
+    </param>
     <effect needs-live-preview="false">
         <object-type>all</object-type>
         <effects-menu>

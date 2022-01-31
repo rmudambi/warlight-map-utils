@@ -1,5 +1,11 @@
 Set default center point using https://blog.mapbox.com/a-new-algorithm-for-finding-a-visual-center-of-a-polygon-7c77e6492fbc
+
 Implement scenario distributions
+
+Create new extension to prepare svg to be uploaded to warzone
+
+Set territory names from the extension
+    select territory and input name
 Create bonus layers and links from the extension
     input name and value and select territories
     checkbox to signify that link should be visible
@@ -12,6 +18,15 @@ Set territory center point from the extension
 Create distribution mode layers from the extension
     input name and if is scenario distribution add scenario name
     select territories to add to distribution
+Find unnamed territories
+    find all territories with territory ids, but no name
+Find bonus-less territories
+    find all territories in no bonuses
+Find connection-less territories
+    find all territories with no connections
+Put existing territories in correct layer
+Put existing bonus links in correct layer
+
 Create INSS bonus layers from the extension
     input key-value pairs for # of territories and income
     select bonus link for the super-bonus to get territories and name
@@ -19,3 +34,6 @@ Create bonus layers for Earthsea
     input key-value pairs for # of territories and income
     select bonus link for the super-bonus to get territories
     select island to get key territory
+
+Add helper text to the extension dialog
+Add a tutorial to the extension page and the github readme

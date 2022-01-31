@@ -6,7 +6,7 @@ import re
 import requests
 from typing import Dict, List, Tuple, Union
 
-from inkex import Boolean, Ellipse, EffectExtension, Group, PathElement, Use
+import inkex
 from inkex.utils import debug
 
 
@@ -41,6 +41,7 @@ class Svg:
 
 class Inkscape:
     LABEL = 'inkscape:label'
+    GROUP_MODE = 'inkscape:groupmode'
     CONNECTION_START = 'inkscape:connection-start'
     CONNECTION_END = 'inkscape:connection-end'
 
@@ -74,23 +75,64 @@ class Warzone:
     UNNAMED_TERRITORY_NAME = 'Unnamed'
 
 
-class WZMapBuilder(EffectExtension):
+class WZMapBuilder(inkex.EffectExtension):
     def add_arguments(self, pars: ArgumentParser) -> None:
+        pars.add_argument("--tab", type=str, default='')
         pars.add_argument("--email", type=str, default='')
         pars.add_argument("--api_token", type=str, default='')
         pars.add_argument("--map_id", type=int)
-        pars.add_argument("--territory_names", type=Boolean, default=False)
-        pars.add_argument("--territory_center_points", type=Boolean, default=False)
-        pars.add_argument("--connections", type=Boolean, default=False)
-        pars.add_argument("--bonuses", type=Boolean, default=False)
-        pars.add_argument("--territory_bonuses", type=Boolean, default=False)
-        pars.add_argument("--distribution_modes", type=Boolean, default=False)
-        pars.add_argument("--territory_distribution_modes", type=Boolean, default=False)
+        pars.add_argument("--territory_names", type=inkex.Boolean, default=False)
+        pars.add_argument("--territory_center_points", type=inkex.Boolean, default=False)
+        pars.add_argument("--connections", type=inkex.Boolean, default=False)
+        pars.add_argument("--bonuses", type=inkex.Boolean, default=False)
+        pars.add_argument("--territory_bonuses", type=inkex.Boolean, default=False)
+        pars.add_argument("--distribution_modes", type=inkex.Boolean, default=False)
+        pars.add_argument("--territory_distribution_modes", type=inkex.Boolean, default=False)
 
-    def effect(self):
+    def effect(self) -> None:
+        {
+            'territory-ids': self._set_territory_ids,
+            'upload': self._upload_metadata,
+        }[self.options.tab]()
+        return
+
+    ###########
+    # EFFECTS #
+    ###########
+
+    def _set_territory_ids(self) -> None:
+        """
+        Sets the id of all selected paths to a Warzone Territory ID and moves them to the
+        Territories layer. If move existing territories checkbox is checked, move all existing
+        territories to the Territories layer.
+        :return:
+        """
+        if not self.svg.selected:
+            raise inkex.AbortExtension("There are no territories selected.")
+
+        territory_layer = self._get_territory_layer()
+        if territory_layer is None:
+            territory_layer = inkex.Group.new(MapLayers.TERRITORIES, **{Inkscape.GROUP_MODE: 'layer'})
+            self.svg.add(territory_layer)
+
+        # todo check for territories in wrong layer
+        territories: List[inkex.PathElement] = territory_layer.xpath(
+            f"./{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}')]",
+            namespaces=NAMESPACES
+        )
+        max_id = max([0] + [self._get_territory_id(territory) for territory in territories])
+
+        for territory in self.svg.selection.filter(inkex.PathElement):
+            if Warzone.TERRITORY_IDENTIFIER not in territory.get_id():
+                max_id += 1
+                territory.set_id(f"{Warzone.TERRITORY_IDENTIFIER}{max_id}")
+            if territory.getparent() != territory_layer:
+                territory.getparent().remove(territory)
+                territory_layer.append(territory)
+
+    def _upload_metadata(self) -> None:
         commands = self._get_commands()
         self._post_map_details(commands)
-        return
 
     ##################
     # HELPER METHODS #
@@ -135,13 +177,14 @@ class WZMapBuilder(EffectExtension):
         """
         Parses svg and creates setTerritoryName commands.
 
-        A command for each path whose ID signifies it is a Warzone Territory (i.e. starts with the
-        Warzone.TERRITORY_IDENTIFIER) and also has a title.
+        A command is created for each path whose ID signifies it is a Warzone Territory (i.e. starts
+        with the Warzone.TERRITORY_IDENTIFIER) and also has a title.
 
         :return:
-        List of setTerritoryNameCommands
+        List of setTerritoryName commands
         """
         territories = self.svg.xpath(
+            # todo look only in territory layer
             f".//{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}') and {Svg.TITLE}]",
             namespaces=NAMESPACES
         )
@@ -156,6 +199,13 @@ class WZMapBuilder(EffectExtension):
         return commands
 
     def _get_set_territory_center_point_commands(self) -> List[Command]:
+        """
+        Parses svg and sets territory center points.
+
+        A command is created for each group that has a territory and an ellipse in it.
+        :return:
+        List of setTerritoryCenterPoint commands
+        """
         groups = self.svg.xpath(
             f".//{Svg.GROUP}["
             f"  {Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}')]"
@@ -172,7 +222,7 @@ class WZMapBuilder(EffectExtension):
             territory = group.find(f"./{Svg.PATH}", namespaces=NAMESPACES)
             territory_id = self._get_territory_id(territory)
             # todo account for matrix transformations in getting center point
-            center_ellipse: Ellipse = group.find(f"./{Svg.ELLIPSE}", namespaces=NAMESPACES)
+            center_ellipse: inkex.Ellipse = group.find(f"./{Svg.ELLIPSE}", namespaces=NAMESPACES)
             x, y = center_ellipse.center
             command = {
                 'command': 'setTerritoryCenterPoint',
@@ -185,6 +235,14 @@ class WZMapBuilder(EffectExtension):
         return commands
 
     def _get_add_territory_connections_commands(self) -> List[Command]:
+        """
+        Parses svg and creates addTerritoryConnection commands
+
+        A command is created for each diagram connector that connects two groups containing a
+        territory.
+        :return:
+        List of addTerritoryConnection commands
+        """
         connection_type_layers = self._get_metadata_type_layers(MapLayers.CONNECTIONS)
 
         commands = []
@@ -226,7 +284,7 @@ class WZMapBuilder(EffectExtension):
         :return:
         List of addBonus commands
         """
-        bonus_links: Dict[str, PathElement] = {
+        bonus_links: Dict[str, inkex.PathElement] = {
             bonus_link.get(Svg.ID): bonus_link
             for bonus_link in self.svg.xpath(
                 f".//{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.BONUS_LINK_IDENTIFIER}')]",
@@ -336,13 +394,26 @@ class WZMapBuilder(EffectExtension):
     # PARSING UTILS #
     #################
 
+    def _get_territory_layer(self) -> inkex.Group:
+        return self.svg.find(
+            f"./{Svg.GROUP}[@{Inkscape.LABEL}='{MapLayers.TERRITORIES}']", NAMESPACES
+        )
+
     @staticmethod
-    def _get_territory_id(territory: Union[str,  PathElement, Use]) -> int:
+    def _get_territory_id(territory: Union[str,  inkex.PathElement, inkex.Use]) -> int:
+        """
+        Returns the id of the territory. If the argument is a string it must be of the form
+        'Territory_X'. If the argument is a territory, it gets the int part of the element's id. If
+        it is a clone, it get the int part of the id of the linked element.
+        :param territory:
+        :return:
+        territory id as required by the Warzone API
+        """
         if isinstance(territory, str):
             territory_id = territory.split(Warzone.TERRITORY_IDENTIFIER)[-1]
-        elif isinstance(territory, PathElement):
+        elif isinstance(territory, inkex.PathElement):
             territory_id = WZMapBuilder._get_territory_id(territory.get(Svg.ID))
-        elif isinstance(territory, Use):
+        elif isinstance(territory, inkex.Use):
             territory_id = WZMapBuilder._get_territory_id(territory.get(get_uri(XLink.HREF)))
         else:
             raise ValueError(f'Element {territory} is not a valid territory element. It must be a'
@@ -350,7 +421,14 @@ class WZMapBuilder(EffectExtension):
         return int(territory_id)
 
     @staticmethod
-    def _get_territory_name(territory: PathElement) -> str:
+    def _get_territory_name(territory: inkex.PathElement) -> str:
+        """
+        Get the name of the territory from its child title element. If no title, returns
+        Warzone.UNNAMED_TERRITORY_NAME
+        :param territory:
+        :return:
+        territory name
+        """
         title = territory.find(Svg.TITLE, NAMESPACES)
         if title is not None:
             territory_name = title.text
@@ -360,7 +438,14 @@ class WZMapBuilder(EffectExtension):
 
     def _get_metadata_type_layers(
             self, metadata_type: str, is_recursive: bool = True
-    ) -> List[Group]:
+    ) -> List[inkex.Group]:
+        """
+        Returns all layers of the input type. If not recursive only retrieves top-level layers
+        :param metadata_type:
+        :param is_recursive:
+        :return:
+        metadata layers
+        """
         slash = '//' if is_recursive else '/'
         bonus_layers = self.svg.xpath(
             f"./{Svg.GROUP}[@{Inkscape.LABEL}='{MapLayers.METADATA}']"
@@ -371,12 +456,24 @@ class WZMapBuilder(EffectExtension):
         return bonus_layers
 
     @staticmethod
-    def _parse_bonus_layer_label(bonus_layer: Group) -> Tuple[str, int]:
+    def _parse_bonus_layer_label(bonus_layer: inkex.Group) -> Tuple[str, int]:
+        """
+        Parses a bonus layer's label to get the bonus name and value.
+        :param bonus_layer:
+        :return:
+        tuple of bonus name and bonus value
+        """
         bonus_name, bonus_value = bonus_layer.get(get_uri(Inkscape.LABEL)).split(': ')
         return bonus_name, int(bonus_value)
 
     @staticmethod
     def _get_bonus_link_id(bonus_name: str) -> str:
+        """
+        Converts a bonus name to the corresponding ID for its bonus link
+        :param bonus_name:
+        :return:
+        bonus link id
+        """
         return Warzone.BONUS_LINK_IDENTIFIER + re.sub(r'[^a-zA-Z0-9]+', '', bonus_name)
 
 
