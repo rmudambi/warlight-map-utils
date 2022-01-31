@@ -2,7 +2,13 @@ Set default center point using https://blog.mapbox.com/a-new-algorithm-for-findi
 
 Implement scenario distributions
 
-Create new extension to prepare svg to be uploaded to warzone
+Create new extension/tab to prepare svg to be uploaded to warzone
+
+Make territories automatically have a rectangle/ellipse with army numbers in it
+    Territories should be groups containing:
+        Path - actual territory borders
+        Rect/Ellipse - defining center point
+        Text - sample army numbers
 
 Set territory names from the extension
     select territory and input name
