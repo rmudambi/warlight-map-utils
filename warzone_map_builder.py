@@ -77,7 +77,7 @@ class Warzone:
 
 class WZMapBuilder(inkex.EffectExtension):
     def add_arguments(self, pars: ArgumentParser) -> None:
-        pars.add_argument("--tab", type=str, default='')
+        pars.add_argument("--tab", type=str, default='about')
 
         # arguments for metadata upload
         pars.add_argument("--email", type=str, default='')
@@ -93,6 +93,7 @@ class WZMapBuilder(inkex.EffectExtension):
 
     def effect(self) -> None:
         {
+            'about': (lambda: ''),
             'territory-ids': self._set_territory_ids,
             'upload': self._upload_metadata,
         }[self.options.tab]()

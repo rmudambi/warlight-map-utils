@@ -4,9 +4,6 @@ Implement scenario distributions
 
 Create new extension to prepare svg to be uploaded to warzone
 
-Fix bug where you have to change the tab first to get it to work
-    Make default tab an info tab
-
 Set territory names from the extension
     select territory and input name
 Create bonus layers and links from the extension
@@ -37,5 +34,6 @@ Create bonus layers for Earthsea
     select bonus link for the super-bonus to get territories
     select island to get key territory
 
-Add helper text to the extension dialog
 Add a tutorial to the extension page and the github readme
+
+Apply button exists on about tab and does nothing
