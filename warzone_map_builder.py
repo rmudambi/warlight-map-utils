@@ -78,6 +78,8 @@ class Warzone:
 class WZMapBuilder(inkex.EffectExtension):
     def add_arguments(self, pars: ArgumentParser) -> None:
         pars.add_argument("--tab", type=str, default='')
+
+        # arguments for metadata upload
         pars.add_argument("--email", type=str, default='')
         pars.add_argument("--api_token", type=str, default='')
         pars.add_argument("--map_id", type=int)
@@ -115,14 +117,14 @@ class WZMapBuilder(inkex.EffectExtension):
             territory_layer = inkex.Group.new(MapLayers.TERRITORIES, **{Inkscape.GROUP_MODE: 'layer'})
             self.svg.add(territory_layer)
 
-        # todo check for territories in wrong layer
-        territories: List[inkex.PathElement] = territory_layer.xpath(
-            f"./{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}')]",
+        territories = self.svg.xpath(
+            f".//{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}')]",
             namespaces=NAMESPACES
         )
         max_id = max([0] + [self._get_territory_id(territory) for territory in territories])
 
-        for territory in self.svg.selection.filter(inkex.PathElement):
+        territories.extend([selected for selected in self.svg.selection.filter(inkex.PathElement)])
+        for territory in territories:
             if Warzone.TERRITORY_IDENTIFIER not in territory.get_id():
                 max_id += 1
                 territory.set_id(f"{Warzone.TERRITORY_IDENTIFIER}{max_id}")

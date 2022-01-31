@@ -4,6 +4,9 @@ Implement scenario distributions
 
 Create new extension to prepare svg to be uploaded to warzone
 
+Fix bug where you have to change the tab first to get it to work
+    Make default tab an info tab
+
 Set territory names from the extension
     select territory and input name
 Create bonus layers and links from the extension
@@ -24,7 +27,6 @@ Find bonus-less territories
     find all territories in no bonuses
 Find connection-less territories
     find all territories with no connections
-Put existing territories in correct layer
 Put existing bonus links in correct layer
 
 Create INSS bonus layers from the extension
