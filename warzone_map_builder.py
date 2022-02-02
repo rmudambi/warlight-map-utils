@@ -34,6 +34,8 @@ class Svg:
     TITLE = 'svg:title'
     CLONE = 'svg:use'
     ELLIPSE = 'svg:ellipse'
+    RECTANGLE = 'svg:rect'
+    TEXT = 'svg:text'
 
     STYLE = 'style'
     FILL = 'fill'
@@ -66,6 +68,7 @@ class MapLayers:
 
 class Color:
     BLACK = '#000000'
+    TERRITORY_FILL = '#FFFFFF'
 
 
 class Warzone:
@@ -74,10 +77,19 @@ class Warzone:
 
     UNNAMED_TERRITORY_NAME = 'Unnamed'
 
+    RECT_WIDTH = 20
+    RECT_HEIGHT = 15
+    RECT_ROUNDING = 5
+
+    ARMY_FONT_SIZE = 13     # px
+
 
 class WZMapBuilder(inkex.EffectExtension):
     def add_arguments(self, pars: ArgumentParser) -> None:
         pars.add_argument("--tab", type=str, default='about')
+
+        # arguments for set territories
+        pars.add_argument("--territory_layer", type=inkex.Boolean, default=True)
 
         # arguments for metadata upload
         pars.add_argument("--email", type=str, default='')
@@ -110,28 +122,45 @@ class WZMapBuilder(inkex.EffectExtension):
         territories to the Territories layer.
         :return:
         """
-        if not self.svg.selected:
-            raise inkex.AbortExtension("There are no territories selected.")
 
         territory_layer = self._get_territory_layer()
-        if territory_layer is None:
-            territory_layer = inkex.Group.new(MapLayers.TERRITORIES, **{Inkscape.GROUP_MODE: 'layer'})
+        if territory_layer is None and self.options.territory_layer:
+            territory_layer = inkex.Layer.new(MapLayers.TERRITORIES)
             self.svg.add(territory_layer)
 
-        territories = self.svg.xpath(
-            f".//{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}')]",
-            namespaces=NAMESPACES
-        )
+        territories: List[inkex.PathElement] = self._get_territories(self.svg)
         max_id = max([0] + [self._get_territory_id(territory) for territory in territories])
 
-        territories.extend([selected for selected in self.svg.selection.filter(inkex.PathElement)])
+        territories += [selected for selected in self.svg.selection.filter(inkex.PathElement)]
         for territory in territories:
             if Warzone.TERRITORY_IDENTIFIER not in territory.get_id():
                 max_id += 1
                 territory.set_id(f"{Warzone.TERRITORY_IDENTIFIER}{max_id}")
-            if territory.getparent() != territory_layer:
-                territory.getparent().remove(territory)
-                territory_layer.append(territory)
+
+            parent: inkex.Group = territory.getparent()
+            if not self._is_territory_group(parent):
+                territory_group = inkex.Group.new(
+                    territory.get_id(),
+                    territory,
+                    self._create_center_point_group(territory),
+                )
+            else:
+                territory_group = parent
+                parent = territory_group.getparent()
+
+            territory_style = territory.effective_style()
+            if territory_style.get_color() != Color.TERRITORY_FILL:
+                territory_style.set_color(Color.TERRITORY_FILL)
+
+            destination = territory_layer if self.options.territory_layer else parent
+            if territory_group not in destination:
+                destination.add(territory_group)
+
+        if not self.svg.selected:
+            debug("There are no territories selected.")
+        if self.options.territory_layer:
+            debug(f"All existing paths with valid Warzone Territory IDs were moved to the "
+                  f"{MapLayers.TERRITORIES} layer.")
 
     def _upload_metadata(self) -> None:
         commands = self._get_commands()
@@ -216,9 +245,6 @@ class WZMapBuilder(inkex.EffectExtension):
             f"]",
             namespaces=NAMESPACES
         )
-
-        # todo use https://blog.mapbox.com/a-new-algorithm-for-finding-a-visual-center-of-a-polygon-7c77e6492fbc
-        #  to set a default center point
 
         commands = []
         for group in groups:
@@ -397,9 +423,28 @@ class WZMapBuilder(inkex.EffectExtension):
     # PARSING UTILS #
     #################
 
-    def _get_territory_layer(self) -> inkex.Group:
+    def _get_territory_layer(self) -> inkex.Layer:
         return self.svg.find(
             f"./{Svg.GROUP}[@{Inkscape.LABEL}='{MapLayers.TERRITORIES}']", NAMESPACES
+        )
+
+    @staticmethod
+    def _is_territory_group(group: inkex.ShapeElement) -> bool:
+        return (
+            isinstance(group, inkex.Group)
+            and not isinstance(group, inkex.Layer)
+            and len(group.getchildren()) == 2
+            and len(group.xpath(f"./{Svg.GROUP}[{Svg.RECTANGLE} and {Svg.TEXT}]")) == 1
+        )
+
+    @staticmethod
+    def _get_territories(
+            root: inkex.BaseElement, is_recursive: bool = True
+    ) -> List[inkex.PathElement]:
+        slash = '//' if is_recursive else '/'
+        return root.xpath(
+            f".{slash}{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}')]",
+            namespaces=NAMESPACES
         )
 
     @staticmethod
@@ -412,6 +457,7 @@ class WZMapBuilder(inkex.EffectExtension):
         :return:
         territory id as required by the Warzone API
         """
+        # todo support territory group?
         if isinstance(territory, str):
             territory_id = territory.split(Warzone.TERRITORY_IDENTIFIER)[-1]
         elif isinstance(territory, inkex.PathElement):
@@ -441,7 +487,7 @@ class WZMapBuilder(inkex.EffectExtension):
 
     def _get_metadata_type_layers(
             self, metadata_type: str, is_recursive: bool = True
-    ) -> List[inkex.Group]:
+    ) -> List[inkex.Layer]:
         """
         Returns all layers of the input type. If not recursive only retrieves top-level layers
         :param metadata_type:
@@ -459,7 +505,7 @@ class WZMapBuilder(inkex.EffectExtension):
         return bonus_layers
 
     @staticmethod
-    def _parse_bonus_layer_label(bonus_layer: inkex.Group) -> Tuple[str, int]:
+    def _parse_bonus_layer_label(bonus_layer: inkex.Layer) -> Tuple[str, int]:
         """
         Parses a bonus layer's label to get the bonus name and value.
         :param bonus_layer:
@@ -478,6 +524,46 @@ class WZMapBuilder(inkex.EffectExtension):
         bonus link id
         """
         return Warzone.BONUS_LINK_IDENTIFIER + re.sub(r'[^a-zA-Z0-9]+', '', bonus_name)
+
+    ####################
+    # METADATA SETTERS #
+    ####################
+
+    @staticmethod
+    def _create_center_point_group(territory: Union[inkex.Group, inkex.PathElement]) -> inkex.Group:
+        # todo use https://blog.mapbox.com/a-new-algorithm-for-finding-a-visual-center-of-a-polygon-7c77e6492fbc
+        #  to set a default center point
+        center = territory.bounding_box().center
+        return inkex.Group.new(
+            territory.get_id(),
+            inkex.Rectangle.new(
+                left=center.x - Warzone.RECT_WIDTH / 2,
+                top=center.y - Warzone.RECT_HEIGHT / 2,
+                width=Warzone.RECT_WIDTH,
+                height=Warzone.RECT_HEIGHT,
+                ry=Warzone.RECT_ROUNDING,
+                style=inkex.Style(
+                    fill='none',
+                    stroke=Color.TERRITORY_FILL,
+                    stroke_width=1.0,
+                    stroke_linecap='round',
+                    stroke_linejoin='round',
+                ),
+            ),
+            inkex.TextElement.new(
+                inkex.Tspan.new(
+                    '88',
+                    style=inkex.Style(
+                        font_weight='bold',
+                        font_size=f'{Warzone.ARMY_FONT_SIZE}px',
+                        text_align='center',
+                        text_anchor='middle',
+                    )
+                ),
+                x=center.x,
+                y=center.y + Warzone.ARMY_FONT_SIZE * 3/8,
+            ),
+        )
 
 
 WZMapBuilder().run()

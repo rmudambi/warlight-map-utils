@@ -6,12 +6,18 @@
         <page name="about" gui-text="About">
             <label appearance="header">About Warzone Map Builder</label>
             <label>This extension enables a user to generate and upload Warzone map metadata.
-It endeavors to replace all the work that would need to be done in the Warzone Map Editor, enabling users define their map entirely in the svg file.
+                <br/><br/>It endeavors to replace all the work that would need to be done in the
+                Warzone Map Editor, enabling users define their map entirely in the svg file.
             </label>
         </page>
-        <page name="territory-ids" gui-text="Territory IDs">
-            <label appearance="header">Set Territory IDs for Selected Paths</label>
-            <label>Sets a Warzone Territory ID for all selected path elements and moves all Warzone Territories to a single layer.</label>
+        <page name="territory-ids" gui-text="Set Territories">
+            <label appearance="header">Set Paths as Warzone Territories</label>
+            <label>Sets a Warzone Territory ID for all selected path elements. Additionally, adds a
+                center-point with example army numbers. Center-points will be generated for all
+                previously existing Warzone Territories that previously lacked them.
+                <br/><br/>Provides the option of moving all Warzone Territories to a single layer.
+            </label>
+            <param name="territory_layer" type="bool" gui-text="Collect all territories into single layer"/>
         </page>
         <page name="upload" gui-text="Upload metadata to Warzone">
             <label appearance="header">Load Map Metadata to Warzone</label>
