@@ -4,14 +4,6 @@ Implement scenario distributions
 
 Create new extension/tab to prepare svg to be uploaded to warzone
 
-Make territories automatically have a rectangle/ellipse with army numbers in it
-    Territories should be groups containing:
-        Path - actual territory borders
-        Rect/Ellipse - defining center point
-        Text - sample army numbers
-
-Set territory names from the extension
-    select territory and input name
 Create bonus layers and links from the extension
     input name and value and select territories
     checkbox to signify that link should be visible

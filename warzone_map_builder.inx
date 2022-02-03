@@ -10,27 +10,38 @@
                 Warzone Map Editor, enabling users define their map entirely in the svg file.
             </label>
         </page>
-        <page name="territory-ids" gui-text="Set Territories">
+        <page name="territories" gui-text="Set Territories">
             <label appearance="header">Set Paths as Warzone Territories</label>
             <label>Sets a Warzone Territory ID for all selected path elements. Additionally, adds a
                 center-point with example army numbers. Center-points will be generated for all
                 previously existing Warzone Territories that previously lacked them.
-                <br/><br/>Provides the option of moving all Warzone Territories to a single layer.
+                <br/><br/>Provides the option of moving all Warzone Territories to a single layer
+                WZ:Territories.
             </label>
-            <param name="territory_layer" type="bool" gui-text="Collect all territories into single layer"/>
+            <param name="territories_territory_layer" type="bool" gui-text="Collect all territories into single layer"/>
+        </page>
+        <page name="territory-name" gui-text="Set Territory Name">
+            <label appearance="header">Set Territories Names</label>
+            <label>Sets the name of a selected path which is intended as a Warzone Territory. If the
+                path does not currently have a Warzone Territory ID of center-point, these are
+                created.
+                <br/><br/>Provides the option of moving this territory to a WZ:Territories layer.
+            </label>
+            <param name="territory_name" type="string" gui-text="Territory Name">Unnamed</param>
+            <param name="territory_name_territory_layer" type="bool" gui-text="Move this territory to the territory layer"/>
         </page>
         <page name="upload" gui-text="Upload metadata to Warzone">
             <label appearance="header">Load Map Metadata to Warzone</label>
-            <param name="email" type="string" gui-text="Warzone Email Address"/>
-            <param name="api_token" type="string" gui-text="Warzone API Token"/>
-            <param name="map_id" type="int" min="0" max="9999999" gui-text="Warzone Map ID"/>
-            <param name="territory_names" type="bool" gui-text="Set Territory Names">false</param>
-            <param name="territory_center_points" type="bool" gui-text="Set Territory Center Points">false</param>
-            <param name="connections" type="bool" gui-text="Set Connections">false</param>
-            <param name="bonuses" type="bool" gui-text="Add Bonuses">false</param>
-            <param name="territory_bonuses" type="bool" gui-text="Add Territories to Bonuses">false</param>
-            <param name="distribution_modes" type="bool" gui-text="Add Distribution Modes">false</param>
-            <param name="territory_distribution_modes" type="bool" gui-text="Add Territories to Distribution Modes">false</param>
+            <param name="upload_email" type="string" gui-text="Warzone Email Address"/>
+            <param name="upload_api_token" type="string" gui-text="Warzone API Token"/>
+            <param name="upload_map_id" type="int" min="0" max="9999999" gui-text="Warzone Map ID"/>
+            <param name="upload_territory_names" type="bool" gui-text="Set Territory Names"/>
+            <param name="upload_territory_center_points" type="bool" gui-text="Set Territory Center Points"/>
+            <param name="upload_connections" type="bool" gui-text="Set Connections"/>
+            <param name="upload_bonuses" type="bool" gui-text="Add Bonuses"/>
+            <param name="upload_territory_bonuses" type="bool" gui-text="Add Territories to Bonuses"/>
+            <param name="upload_distribution_modes" type="bool" gui-text="Add Distribution Modes"/>
+            <param name="upload_territory_distribution_modes" type="bool" gui-text="Add Territories to Distribution Modes"/>
         </page>
     </param>
     <effect needs-live-preview="false">

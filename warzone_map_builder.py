@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 import json
 import re
 import requests
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import inkex
 from inkex.utils import debug
@@ -85,28 +85,33 @@ class Warzone:
 
 
 class WZMapBuilder(inkex.EffectExtension):
-    def add_arguments(self, pars: ArgumentParser) -> None:
-        pars.add_argument("--tab", type=str, default='about')
+    def add_arguments(self, ap: ArgumentParser) -> None:
+        ap.add_argument("--tab", type=str, default='about')
 
         # arguments for set territories
-        pars.add_argument("--territory_layer", type=inkex.Boolean, default=True)
+        ap.add_argument("--territories_territory_layer", type=inkex.Boolean, default=True)
+
+        # arguments for set territory name
+        ap.add_argument("--territory_name", type=str, default=Warzone.UNNAMED_TERRITORY_NAME)
+        ap.add_argument("--territory_name_territory_layer", type=inkex.Boolean, default=True)
 
         # arguments for metadata upload
-        pars.add_argument("--email", type=str, default='')
-        pars.add_argument("--api_token", type=str, default='')
-        pars.add_argument("--map_id", type=int)
-        pars.add_argument("--territory_names", type=inkex.Boolean, default=False)
-        pars.add_argument("--territory_center_points", type=inkex.Boolean, default=False)
-        pars.add_argument("--connections", type=inkex.Boolean, default=False)
-        pars.add_argument("--bonuses", type=inkex.Boolean, default=False)
-        pars.add_argument("--territory_bonuses", type=inkex.Boolean, default=False)
-        pars.add_argument("--distribution_modes", type=inkex.Boolean, default=False)
-        pars.add_argument("--territory_distribution_modes", type=inkex.Boolean, default=False)
+        ap.add_argument("--upload_email", type=str, default='')
+        ap.add_argument("--upload_api_token", type=str, default='')
+        ap.add_argument("--upload_map_id", type=int)
+        ap.add_argument("--upload_territory_names", type=inkex.Boolean, default=False)
+        ap.add_argument("--upload_territory_center_points", type=inkex.Boolean, default=False)
+        ap.add_argument("--upload_connections", type=inkex.Boolean, default=False)
+        ap.add_argument("--upload_bonuses", type=inkex.Boolean, default=False)
+        ap.add_argument("--upload_territory_bonuses", type=inkex.Boolean, default=False)
+        ap.add_argument("--upload_distribution_modes", type=inkex.Boolean, default=False)
+        ap.add_argument("--upload_territory_distribution_modes", type=inkex.Boolean, default=False)
 
     def effect(self) -> None:
         {
             'about': (lambda: ''),
-            'territory-ids': self._set_territory_ids,
+            'territories': self._set_territories,
+            'territory-name': self._set_territory_name,
             'upload': self._upload_metadata,
         }[self.options.tab]()
         return
@@ -115,55 +120,50 @@ class WZMapBuilder(inkex.EffectExtension):
     # EFFECTS #
     ###########
 
-    def _set_territory_ids(self) -> None:
+    def _set_territories(self) -> None:
         """
-        Sets the id of all selected paths to a Warzone Territory ID and moves them to the
-        Territories layer. If move existing territories checkbox is checked, move all existing
+        Converts all selected paths to a Warzone Territories by setting a Warzone Territory ID and
+        creating a territory group. If territory-layer checkbox is checked, move all existing
         territories to the Territories layer.
         :return:
         """
 
-        territory_layer = self._get_territory_layer()
-        if territory_layer is None and self.options.territory_layer:
-            territory_layer = inkex.Layer.new(MapLayers.TERRITORIES)
-            self.svg.add(territory_layer)
-
-        territories: List[inkex.PathElement] = self._get_territories(self.svg)
-        max_id = max([0] + [self._get_territory_id(territory) for territory in territories])
-
+        territory_layer = (
+            self._get_or_create_territory_layer()
+            if self.options.territories_territory_layer else None
+        )
+        territories = self._get_territories(self.svg)
+        max_id = self.get_max_territory_id(territories)
         territories += [selected for selected in self.svg.selection.filter(inkex.PathElement)]
         for territory in territories:
-            if Warzone.TERRITORY_IDENTIFIER not in territory.get_id():
-                max_id += 1
-                territory.set_id(f"{Warzone.TERRITORY_IDENTIFIER}{max_id}")
-
-            parent: inkex.Group = territory.getparent()
-            if not self._is_territory_group(parent):
-                territory_group = inkex.Group.new(
-                    territory.get_id(),
-                    territory,
-                    self._create_center_point_group(territory),
-                )
-            else:
-                territory_group = parent
-                parent = territory_group.getparent()
-
-            territory_style = territory.effective_style()
-            if territory_style.get_color() != Color.TERRITORY_FILL:
-                territory_style.set_color(Color.TERRITORY_FILL)
-
-            destination = territory_layer if self.options.territory_layer else parent
-            if territory_group not in destination:
-                destination.add(territory_group)
-
+            self.create_territory(territory, max_id, territory_layer)
         if not self.svg.selected:
-            debug("There are no territories selected.")
-        if self.options.territory_layer:
+            debug("There are no territories selected. Territories must be paths.")
+        if self.options.territories_territory_layer:
             debug(f"All existing paths with valid Warzone Territory IDs were moved to the "
                   f"{MapLayers.TERRITORIES} layer.")
 
+    def _set_territory_name(self) -> None:
+        """
+        Sets the title of the selected path to the input name. If path isn't a Warzone Territory,
+        converts it into one. If territory-layer checkbox is checked, move to the Territories layer.
+        :return:
+        """
+        selected_paths = self.svg.selection.filter(inkex.PathElement)
+        if len(selected_paths) != 1:
+            debug("There must be exactly one selected path element.")
+            return
+
+        territory_layer = (
+            self._get_or_create_territory_layer()
+            if self.options.territory_name_territory_layer else None
+        )
+        territory = selected_paths.pop()
+        territory.add(inkex.Title.new(self.options.territory_name))
+        self.create_territory(territory, self.get_max_territory_id(), territory_layer)
+
     def _upload_metadata(self) -> None:
-        commands = self._get_commands()
+        commands = self._get_set_metadata_commands()
         self._post_map_details(commands)
 
     ##################
@@ -183,21 +183,21 @@ class WZMapBuilder(inkex.EffectExtension):
 
         debug(json.loads(response.text))
 
-    def _get_commands(self) -> List[Command]:
+    def _get_set_metadata_commands(self) -> List[Command]:
         commands = []
-        if self.options.territory_names:
+        if self.options.upload_territory_names:
             commands += self._get_set_territory_name_commands()
-        if self.options.territory_center_points:
+        if self.options.upload_territory_center_points:
             commands += self._get_set_territory_center_point_commands()
-        if self.options.connections:
+        if self.options.upload_connections:
             commands += self._get_add_territory_connections_commands()
-        if self.options.bonuses:
+        if self.options.upload_bonuses:
             commands += self._get_add_bonus_commands()
-        if self.options.territory_bonuses:
+        if self.options.upload_territory_bonuses:
             commands += self._get_add_territory_to_bonus_commands()
-        if self.options.distribution_modes:
+        if self.options.upload_distribution_modes:
             commands += self._get_add_distribution_mode_commands()
-        if self.options.territory_distribution_modes:
+        if self.options.upload_territory_distribution_modes:
             commands += self._get_add_territory_to_distribution_commands()
         return commands
 
@@ -423,17 +423,35 @@ class WZMapBuilder(inkex.EffectExtension):
     # PARSING UTILS #
     #################
 
-    def _get_territory_layer(self) -> inkex.Layer:
-        return self.svg.find(
+    def _get_or_create_territory_layer(self) -> Optional[inkex.Layer]:
+        """
+        Returns the territory layer. Creates it if it doesn't exist.
+        :return:
+        territory_layer
+        """
+        territory_layer = self.svg.find(
             f"./{Svg.GROUP}[@{Inkscape.LABEL}='{MapLayers.TERRITORIES}']", NAMESPACES
         )
 
+        if territory_layer is None:
+            territory_layer = inkex.Layer.new(MapLayers.TERRITORIES)
+            self.svg.add(territory_layer)
+        return territory_layer
+
     @staticmethod
     def _is_territory_group(group: inkex.ShapeElement) -> bool:
+        """
+        Checks if element is a territory group. It is a territory group if it is a non-layer Group
+        and has two children, one of which is a territory, the other of which is a center point
+        group.
+        :param group:
+        :return:
+        """
         return (
             isinstance(group, inkex.Group)
             and not isinstance(group, inkex.Layer)
             and len(group.getchildren()) == 2
+            and len(WZMapBuilder._get_territories(group, is_recursive=False)) == 1
             and len(group.xpath(f"./{Svg.GROUP}[{Svg.RECTANGLE} and {Svg.TEXT}]")) == 1
         )
 
@@ -441,9 +459,17 @@ class WZMapBuilder(inkex.EffectExtension):
     def _get_territories(
             root: inkex.BaseElement, is_recursive: bool = True
     ) -> List[inkex.PathElement]:
+        """
+        Gets all territory elements that are children of the root node. If not is_recursive, gets
+        only direct children.
+        :param root:
+        :param is_recursive:
+        :return:
+        """
         slash = '//' if is_recursive else '/'
         return root.xpath(
             f".{slash}{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}')]",
+            # todo see if we can remove this argument
             namespaces=NAMESPACES
         )
 
@@ -484,6 +510,51 @@ class WZMapBuilder(inkex.EffectExtension):
         else:
             territory_name = Warzone.UNNAMED_TERRITORY_NAME
         return territory_name
+
+    def get_max_territory_id(self, territories: List[inkex.PathElement] = None) -> int:
+        """
+        Gets the maximum territory id as an int in the territories. If territories is None, searches
+        the whole svg.
+        :return:
+        maximum int id
+        """
+        territories = self._get_territories(self.svg) if territories is None else territories
+        max_id = max([0] + [self._get_territory_id(territory) for territory in territories])
+        return max_id
+
+    def create_territory(
+            self, territory: inkex.PathElement, max_id: int, territory_layer: inkex.Layer = None
+    ) -> None:
+        """
+        Converts territory path into a Warzone Territory.
+
+        Sets the id of territory to the next Warzone Territory ID after the current maximum and
+        creates a territory group containing a center-point and display army numbers. If
+        territory_layer argument is passed, move territory group to the Territories layer.
+
+        :param max_id:
+        :param territory:
+        :param territory_layer:
+        """
+        if Warzone.TERRITORY_IDENTIFIER not in territory.get_id():
+            max_id += 1
+            territory.set_id(f"{Warzone.TERRITORY_IDENTIFIER}{max_id}")
+        parent: inkex.Group = territory.getparent()
+        if not self._is_territory_group(parent):
+            territory_group = inkex.Group.new(
+                territory.get_id(),
+                territory,
+                self._create_center_point_group(territory),
+            )
+        else:
+            territory_group = parent
+            parent = territory_group.getparent()
+        territory_style = territory.effective_style()
+        if territory_style.get_color() != Color.TERRITORY_FILL:
+            territory_style.set_color(Color.TERRITORY_FILL)
+        destination = territory_layer if self.options.territories_territory_layer else parent
+        if territory_group not in destination:
+            destination.add(territory_group)
 
     def _get_metadata_type_layers(
             self, metadata_type: str, is_recursive: bool = True
@@ -531,6 +602,13 @@ class WZMapBuilder(inkex.EffectExtension):
 
     @staticmethod
     def _create_center_point_group(territory: Union[inkex.Group, inkex.PathElement]) -> inkex.Group:
+        """
+        Creates a group containing a rounded rectangle and sample army numbers centered at the
+        territory's center-point
+        :param territory:
+        :return:
+        center point group
+        """
         # todo use https://blog.mapbox.com/a-new-algorithm-for-finding-a-visual-center-of-a-polygon-7c77e6492fbc
         #  to set a default center point
         center = territory.bounding_box().center
