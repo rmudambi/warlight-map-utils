@@ -18,30 +18,46 @@
                 <br/><br/>Provides the option of moving all Warzone Territories to a single layer
                 WZ:Territories.
             </label>
-            <param name="territories_territory_layer" type="bool" gui-text="Collect all territories into single layer"/>
+            <param name="territories_territory_layer" type="bool" gui-text="Collect all territories into single layer">true</param>
         </page>
         <page name="territory-name" gui-text="Set Territory Name">
-            <label appearance="header">Set Territories Names</label>
+            <label appearance="header">Set Territory Name</label>
             <label>Sets the name of a selected path which is intended as a Warzone Territory. If the
                 path does not currently have a Warzone Territory ID of center-point, these are
                 created.
                 <br/><br/>Provides the option of moving this territory to a WZ:Territories layer.
             </label>
             <param name="territory_name" type="string" gui-text="Territory Name">Unnamed</param>
-            <param name="territory_name_territory_layer" type="bool" gui-text="Move this territory to the territory layer"/>
+            <param name="territory_name_territory_layer" type="bool" gui-text="Move this territory to the territory layer">true</param>
         </page>
-        <page name="upload" gui-text="Upload metadata to Warzone">
+        <page name="bonus" gui-text="Bonus">
+            <label appearance="header">Create Bonus</label>
+            <label>
+                Creates or updates a bonus with the given name. Selected territories will be added to the bonus.
+                <br/><br/>If the bonus value or color is empty, these attributes of an existing
+                bonus will not be changed. However, an error will be thrown if the bonus does not
+                already exist.
+                <br/><br/>Optionally may choose to make the bonus link invisible. Also may choose to
+                replace or append to existing territories.
+            </label>
+            <param name="bonus_name" type="string" gui-text="Bonus Name"/>
+            <param name="bonus_value" type="string" gui-text="Bonus Value"/>
+            <param name="bonus_color" type="string" gui-text="Bonus Color">#000000</param>
+            <param name="bonus_link_visible" type="bool" gui-text="Bonus link should be visible">true</param>
+            <param name="bonus_replace" type="bool" gui-text="Replace all existing territories in bonus">true</param>
+        </page>
+        <page name="upload" gui-text="Upload metadata">
             <label appearance="header">Load Map Metadata to Warzone</label>
             <param name="upload_email" type="string" gui-text="Warzone Email Address"/>
             <param name="upload_api_token" type="string" gui-text="Warzone API Token"/>
             <param name="upload_map_id" type="int" min="0" max="9999999" gui-text="Warzone Map ID"/>
-            <param name="upload_territory_names" type="bool" gui-text="Set Territory Names"/>
-            <param name="upload_territory_center_points" type="bool" gui-text="Set Territory Center Points"/>
-            <param name="upload_connections" type="bool" gui-text="Set Connections"/>
-            <param name="upload_bonuses" type="bool" gui-text="Add Bonuses"/>
-            <param name="upload_territory_bonuses" type="bool" gui-text="Add Territories to Bonuses"/>
-            <param name="upload_distribution_modes" type="bool" gui-text="Add Distribution Modes"/>
-            <param name="upload_territory_distribution_modes" type="bool" gui-text="Add Territories to Distribution Modes"/>
+            <param name="upload_territory_names" type="bool" gui-text="Set Territory Names">false</param>
+            <param name="upload_territory_center_points" type="bool" gui-text="Set Territory Center Points">false</param>
+            <param name="upload_connections" type="bool" gui-text="Set Connections">false</param>
+            <param name="upload_bonuses" type="bool" gui-text="Add Bonuses">false</param>
+            <param name="upload_territory_bonuses" type="bool" gui-text="Add Territories to Bonuses">false</param>
+            <param name="upload_distribution_modes" type="bool" gui-text="Add Distribution Modes">false</param>
+            <param name="upload_territory_distribution_modes" type="bool" gui-text="Add Territories to Distribution Modes">false</param>
         </page>
     </param>
     <effect needs-live-preview="false">

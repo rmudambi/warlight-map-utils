@@ -20,6 +20,10 @@ NAMESPACES = {
 }
 
 
+class WarzoneMapBuilderException(ValueError):
+    """specify exception raised by"""
+
+
 def get_uri(key: str) -> str:
     if ':' in key:
         namespace, key = key.split(':')
@@ -36,9 +40,12 @@ class Svg:
     ELLIPSE = 'svg:ellipse'
     RECTANGLE = 'svg:rect'
     TEXT = 'svg:text'
+    TSPAN = 'svg:tspan'
 
     STYLE = 'style'
     FILL = 'fill'
+    STROKE = 'stroke'
+    STROKE_WIDTH = 'stroke-width'
 
 
 class Inkscape:
@@ -68,7 +75,9 @@ class MapLayers:
 
 class Color:
     BLACK = '#000000'
+    WHITE = '#FFFFFF'
     TERRITORY_FILL = '#FFFFFF'
+    BONUS_LINK_STROKE = '#FFFF00'
 
 
 class Warzone:
@@ -77,9 +86,11 @@ class Warzone:
 
     UNNAMED_TERRITORY_NAME = 'Unnamed'
 
+    BONUS_LINK_SIDE = 20
+
     RECT_WIDTH = 20
     RECT_HEIGHT = 15
-    RECT_ROUNDING = 5
+    RECT_ROUNDING = 4
 
     ARMY_FONT_SIZE = 13     # px
 
@@ -95,6 +106,13 @@ class WZMapBuilder(inkex.EffectExtension):
         ap.add_argument("--territory_name", type=str, default=Warzone.UNNAMED_TERRITORY_NAME)
         ap.add_argument("--territory_name_territory_layer", type=inkex.Boolean, default=True)
 
+        # arguments for set bonus
+        ap.add_argument("--bonus_name", type=str, default=Warzone.UNNAMED_TERRITORY_NAME)
+        ap.add_argument("--bonus_value", type=str, default='')
+        ap.add_argument("--bonus_color", type=str, default=Color.BLACK)
+        ap.add_argument("--bonus_link_visible", type=inkex.Boolean, default=True)
+        ap.add_argument("--bonus_replace", type=inkex.Boolean, default=True)
+
         # arguments for metadata upload
         ap.add_argument("--upload_email", type=str, default='')
         ap.add_argument("--upload_api_token", type=str, default='')
@@ -108,12 +126,16 @@ class WZMapBuilder(inkex.EffectExtension):
         ap.add_argument("--upload_territory_distribution_modes", type=inkex.Boolean, default=False)
 
     def effect(self) -> None:
-        {
-            'about': (lambda: ''),
-            'territories': self._set_territories,
-            'territory-name': self._set_territory_name,
-            'upload': self._upload_metadata,
-        }[self.options.tab]()
+        try:
+            {
+                'about': (lambda: ''),
+                'territories': self._set_territories,
+                'territory-name': self._set_territory_name,
+                'bonus': self._set_bonus,
+                'upload': self._upload_metadata,
+            }[self.options.tab]()
+        except WarzoneMapBuilderException as e:
+            debug(e)
         return
 
     ###########
@@ -136,7 +158,7 @@ class WZMapBuilder(inkex.EffectExtension):
         max_id = self.get_max_territory_id(territories)
         territories += [selected for selected in self.svg.selection.filter(inkex.PathElement)]
         for territory in territories:
-            self.create_territory(territory, max_id, territory_layer)
+            max_id = self.create_territory(territory, max_id, territory_layer)
         if not self.svg.selected:
             debug("There are no territories selected. Territories must be paths.")
         if self.options.territories_territory_layer:
@@ -161,6 +183,50 @@ class WZMapBuilder(inkex.EffectExtension):
         territory = selected_paths.pop()
         territory.add(inkex.Title.new(self.options.territory_name))
         self.create_territory(territory, self.get_max_territory_id(), territory_layer)
+
+    def _set_bonus(self) -> None:
+        """
+        Creates a bonus layer if it doesn't exist and adds the selected territories to it. If the
+        bonus previously existed, either adds the territories to the bonus or replaces existing
+        territories depending on bonus_replace option. Creates a bonus-link if necessary.
+        :return:
+        """
+        # todo allow bonus to be selected if bonus link is in selection
+        territories = [
+            self._get_territories(group)[0] for group in self.svg.selection.filter(inkex.Group)
+            if self._is_territory_group(group)
+        ]
+        self.svg.selection.set(*territories)
+
+        if self.options.bonus_link_visible:
+            bonus_link_layer = self._get_or_create_bonus_link_layer()
+            bonus_link = self._set_bonus_link(
+                bonus_link_layer,
+                self.options.bonus_name,
+                self.options.bonus_value,
+                self.options.bonus_color,
+                self.svg.selection.bounding_box().center
+            )
+        else:
+            bonus_link = None
+
+        # bonus_layer = self._get_or_create_bonus_layer(
+        #     self.options.bonus_name, self.options.bonus_value
+        # )
+        #
+        # bonus_territories = []
+        # for territory in territories:
+        #     bonus_territories.append(
+        #         self._create_bonus_territory(territory, bonus_layer)
+        #     )
+        #
+        # if self.options.bonus_replace:
+        #     bonus_layer.remove_all()
+        #
+        # bonus_layer.add(bonus_territories)
+        # # todo set stroke color of all territories
+        # # todo reselect original selection
+        # pass
 
     def _upload_metadata(self) -> None:
         commands = self._get_set_metadata_commands()
@@ -248,10 +314,10 @@ class WZMapBuilder(inkex.EffectExtension):
 
         commands = []
         for group in groups:
-            territory = group.find(f"./{Svg.PATH}", namespaces=NAMESPACES)
+            territory = group.find(f"./{Svg.PATH}", NAMESPACES)
             territory_id = self._get_territory_id(territory)
             # todo account for matrix transformations in getting center point
-            center_ellipse: inkex.Ellipse = group.find(f"./{Svg.ELLIPSE}", namespaces=NAMESPACES)
+            center_ellipse: inkex.Ellipse = group.find(f"./{Svg.ELLIPSE}", NAMESPACES)
             x, y = center_ellipse.center
             command = {
                 'command': 'setTerritoryCenterPoint',
@@ -522,40 +588,6 @@ class WZMapBuilder(inkex.EffectExtension):
         max_id = max([0] + [self._get_territory_id(territory) for territory in territories])
         return max_id
 
-    def create_territory(
-            self, territory: inkex.PathElement, max_id: int, territory_layer: inkex.Layer = None
-    ) -> None:
-        """
-        Converts territory path into a Warzone Territory.
-
-        Sets the id of territory to the next Warzone Territory ID after the current maximum and
-        creates a territory group containing a center-point and display army numbers. If
-        territory_layer argument is passed, move territory group to the Territories layer.
-
-        :param max_id:
-        :param territory:
-        :param territory_layer:
-        """
-        if Warzone.TERRITORY_IDENTIFIER not in territory.get_id():
-            max_id += 1
-            territory.set_id(f"{Warzone.TERRITORY_IDENTIFIER}{max_id}")
-        parent: inkex.Group = territory.getparent()
-        if not self._is_territory_group(parent):
-            territory_group = inkex.Group.new(
-                territory.get_id(),
-                territory,
-                self._create_center_point_group(territory),
-            )
-        else:
-            territory_group = parent
-            parent = territory_group.getparent()
-        territory_style = territory.effective_style()
-        if territory_style.get_color() != Color.TERRITORY_FILL:
-            territory_style.set_color(Color.TERRITORY_FILL)
-        destination = territory_layer if self.options.territories_territory_layer else parent
-        if territory_group not in destination:
-            destination.add(territory_group)
-
     def _get_metadata_type_layers(
             self, metadata_type: str, is_recursive: bool = True
     ) -> List[inkex.Layer]:
@@ -586,6 +618,16 @@ class WZMapBuilder(inkex.EffectExtension):
         bonus_name, bonus_value = bonus_layer.get(get_uri(Inkscape.LABEL)).split(': ')
         return bonus_name, int(bonus_value)
 
+    def _get_or_create_bonus_link_layer(self) -> inkex.Layer:
+        """Gets the bonus link layer"""
+        layer = self.svg.find(
+            f"./{Svg.GROUP}[{Inkscape.LABEL}='{MapLayers.BONUS_LINKS}']", NAMESPACES
+        )
+        if layer is None:
+            layer = inkex.Layer.new(MapLayers.BONUS_LINKS)
+            self.svg.add(layer)
+        return layer
+
     @staticmethod
     def _get_bonus_link_id(bonus_name: str) -> str:
         """
@@ -596,9 +638,65 @@ class WZMapBuilder(inkex.EffectExtension):
         """
         return Warzone.BONUS_LINK_IDENTIFIER + re.sub(r'[^a-zA-Z0-9]+', '', bonus_name)
 
+    @staticmethod
+    def _is_bonus_link_group(group: inkex.ShapeElement) -> bool:
+        """
+        Checks if element is a bonus link group. It is a bonus link group if it is a non-layer Group
+        and has two children, one of which is a bonus link, the other of which is a text element.
+        :param group:
+        :return:
+        """
+        return (
+            isinstance(group, inkex.Group)
+            and not isinstance(group, inkex.Layer)
+            and len(group.getchildren()) == 2
+            and (len(group.xpath(
+                    f"./{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.BONUS_LINK_IDENTIFIER}')]",
+                    NAMESPACES
+                )) == 1)
+            and (group.find(f"./{Svg.TEXT}") is not None)
+        )
+
     ####################
     # METADATA SETTERS #
     ####################
+
+    def create_territory(
+            self, territory: inkex.PathElement, max_id: int, territory_layer: inkex.Layer = None
+    ) -> int:
+        """
+        Converts territory path into a Warzone Territory.
+
+        Sets the id of territory to the next Warzone Territory ID after the current maximum and
+        creates a territory group containing a center-point and display army numbers. If
+        territory_layer argument is passed, move territory group to the Territories layer.
+
+        :param max_id:
+        :param territory:
+        :param territory_layer:
+        :return maximum territory id as int
+        """
+        if Warzone.TERRITORY_IDENTIFIER not in territory.get_id():
+            max_id += 1
+            territory.set_id(f"{Warzone.TERRITORY_IDENTIFIER}{max_id}")
+        parent: inkex.Group = territory.getparent()
+        if not self._is_territory_group(parent):
+            territory_group = inkex.Group.new(
+                territory.get_id(),
+                territory,
+                self._create_center_point_group(territory),
+            )
+        else:
+            territory_group = parent
+            parent = territory_group.getparent()
+        territory_style = territory.effective_style()
+        territory_style[Svg.STROKE_WIDTH] = 1
+        if territory_style.get_color() != Color.TERRITORY_FILL:
+            territory_style.set_color(Color.TERRITORY_FILL)
+        destination = territory_layer if self.options.territories_territory_layer else parent
+        if territory_group not in destination:
+            destination.add(territory_group)
+        return max_id
 
     @staticmethod
     def _create_center_point_group(territory: Union[inkex.Group, inkex.PathElement]) -> inkex.Group:
@@ -620,6 +718,7 @@ class WZMapBuilder(inkex.EffectExtension):
                 width=Warzone.RECT_WIDTH,
                 height=Warzone.RECT_HEIGHT,
                 ry=Warzone.RECT_ROUNDING,
+                rx=Warzone.RECT_ROUNDING,
                 style=inkex.Style(
                     fill='none',
                     stroke=Color.TERRITORY_FILL,
@@ -629,18 +728,130 @@ class WZMapBuilder(inkex.EffectExtension):
                 ),
             ),
             inkex.TextElement.new(
-                inkex.Tspan.new(
-                    '88',
-                    style=inkex.Style(
-                        font_weight='bold',
-                        font_size=f'{Warzone.ARMY_FONT_SIZE}px',
-                        text_align='center',
-                        text_anchor='middle',
-                    )
-                ),
+                WZMapBuilder.create_tspan('88', font_color=Color.BLACK),
                 x=center.x,
                 y=center.y + Warzone.ARMY_FONT_SIZE * 3/8,
             ),
+        )
+
+    def _set_bonus_link(
+            self,
+            bonus_link_layer: inkex.Layer,
+            bonus_name: str,
+            bonus_value: str,
+            bonus_color: str,
+            location: inkex.Vector2d
+    ) -> inkex.Group:
+        """
+        Creates a bonus link if it doesn't exist and adds it to the bonus link layer. Updates any
+        properties of bonus link it if already exists.
+
+        :param bonus_name:
+        :param bonus_value:
+        :param bonus_color:
+        :return:
+        bonus link
+        """
+        # Get bonus link path if it exists
+        bonus_link_id = self._get_bonus_link_id(bonus_name)
+        bonus_link_path: inkex.PathElement = self.svg.find(
+            f".//{Svg.PATH}[{Svg.ID}='{bonus_link_id}']", NAMESPACES
+        )
+
+        # Create bonus link path if it does not exist
+        if new_link := bonus_link_path is None:
+            bonus_link_path = inkex.Rectangle.new(
+                left=location.x - Warzone.BONUS_LINK_SIDE / 2,
+                top=location.y - Warzone.BONUS_LINK_SIDE / 2,
+                width=Warzone.BONUS_LINK_SIDE,
+                height=Warzone.BONUS_LINK_SIDE,
+                ry=Warzone.RECT_ROUNDING,
+                rx=Warzone.RECT_ROUNDING,
+                id=bonus_link_id
+            ).to_path_element()
+
+        # Set bonus link fill and stroke
+        bonus_link_style = bonus_link_path.effective_style()
+        bonus_link_style.set_color(Color.BONUS_LINK_STROKE, name=Svg.STROKE)
+        try:
+            bonus_link_style.set_color(bonus_color)
+        except inkex.colors.ColorError:
+            error_message = (
+                f"If creating a new bonus with a bonus link, a bonus color must be provided as an"
+                f" RGB string in the form '#00EE33'. Provided {bonus_color}"
+                if new_link else
+                f"If a bonus color is provided if must be an RGB string in the form '#00EE33'."
+                f" Provided {bonus_color}"
+            )
+            raise WarzoneMapBuilderException(error_message)
+
+        # Get bonus link group
+        parent = bonus_link_path.getparent()
+        if self._is_bonus_link_group(parent):
+            bonus_link = parent
+        else:
+            # Create bonus link group if it doesn't exist
+            bonus_link = inkex.Group.new(
+                "bonus_link.get_id()",
+                bonus_link_path,
+                inkex.TextElement.new(
+                    self.create_tspan(bonus_value, font_color=Color.WHITE),
+                    x=location.x,
+                    y=location.y + Warzone.ARMY_FONT_SIZE * 3 / 8,
+                ),
+            )
+
+        # Set bonus link font color
+        tspan: inkex.Tspan = bonus_link.find(f"./{Svg.TEXT}/{Svg.TSPAN}", NAMESPACES)
+        tspan.effective_style().set_color(
+            Color.WHITE if bonus_link_style.get_color().to_rgb().to_hsl().lightness < 128
+            else Color.BLACK
+        )
+        # Set bonus link value
+        if bonus_value and tspan.text != bonus_value:
+            tspan.text = bonus_value
+
+        # Add bonus link to bonus link layer
+        if bonus_link.getparent() != bonus_link_layer:
+            bonus_link_layer.add(bonus_link)
+        return bonus_link
+
+    def _get_or_create_bonus_layer(self, bonus_name: str, bonus_value: str) -> inkex.Layer:
+        """
+
+        :param bonus_name:
+        :param bonus_value:
+        :return:
+        """
+        # todo create bonuses layer if not exists
+        # todo throw exception if creating layer and no bonus value provided
+        # todo create this bonus layer if not exists
+        return None
+
+    @staticmethod
+    def _create_bonus_territory(
+            territory: inkex.PathElement, bonus_layer: inkex.Layer
+    ) -> inkex.PathElement:
+        """
+
+        :param territory:
+        :param bonus_layer:
+        :return:
+        """
+        # todo create clone
+        return None
+
+    @staticmethod
+    def create_tspan(bonus_value, font_color: str):
+        return inkex.Tspan.new(
+            bonus_value,
+            style=inkex.Style(
+                fill=font_color,
+                font_weight='bold',
+                font_size=f'{Warzone.ARMY_FONT_SIZE}px',
+                text_align='center',
+                text_anchor='middle',
+            )
         )
 
 
