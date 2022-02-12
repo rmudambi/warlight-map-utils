@@ -20,10 +20,6 @@ NAMESPACES = {
 }
 
 
-class WarzoneMapBuilderException(ValueError):
-    """specify exception raised by"""
-
-
 def get_uri(key: str) -> str:
     if ':' in key:
         namespace, key = key.split(':')
@@ -126,16 +122,14 @@ class WZMapBuilder(inkex.EffectExtension):
         ap.add_argument("--upload_territory_distribution_modes", type=inkex.Boolean, default=False)
 
     def effect(self) -> None:
-        try:
-            {
-                'about': (lambda: ''),
-                'territories': self._set_territories,
-                'territory-name': self._set_territory_name,
-                'bonus': self._set_bonus,
-                'upload': self._upload_metadata,
-            }[self.options.tab]()
-        except WarzoneMapBuilderException as e:
-            debug(e)
+        self._setup_map_layers()
+        {
+            'about': (lambda: ''),
+            'territories': self._set_territories,
+            'territory-name': self._set_territory_name,
+            'bonus': self._set_bonus,
+            'upload': self._upload_metadata,
+        }[self.options.tab]()
         return
 
     ###########
@@ -151,7 +145,7 @@ class WZMapBuilder(inkex.EffectExtension):
         """
 
         territory_layer = (
-            self._get_or_create_territory_layer()
+            self._get_territory_layer()
             if self.options.territories_territory_layer else None
         )
         territories = self._get_territories(self.svg)
@@ -177,7 +171,7 @@ class WZMapBuilder(inkex.EffectExtension):
             return
 
         territory_layer = (
-            self._get_or_create_territory_layer()
+            self._get_territory_layer()
             if self.options.territory_name_territory_layer else None
         )
         territory = selected_paths.pop()
@@ -198,7 +192,7 @@ class WZMapBuilder(inkex.EffectExtension):
         ]
 
         if bonus_link is None and not territories:
-            raise WarzoneMapBuilderException("No bonus link or territories have been selected.")
+            raise inkex.AbortExtension("No bonus link or territories have been selected.")
 
         self.svg.selection.set(*territories)
 
@@ -209,7 +203,9 @@ class WZMapBuilder(inkex.EffectExtension):
         else:
             bonus_link = None
 
-        bonus_territories = [inkex.Use.new(territory.getparent(), 0, 0) for territory in territories]
+        bonus_territories = [
+            inkex.Use.new(territory.getparent(), 0, 0) for territory in territories
+        ]
         if self.options.bonus_replace:
             bonus_layer.remove_all()
 
@@ -218,7 +214,6 @@ class WZMapBuilder(inkex.EffectExtension):
             f"./{Svg.CLONE}[@{XLink.HREF}='#{bonus_link.get_id()}']", bonus_layer
         ) is None:
             bonus_layer.add(inkex.Use.new(bonus_link, 0, 0))
-        # todo metadata layer should be bottom-most layer
         # todo set stroke color of all territories
         # todo reselect original selection
         pass
@@ -503,7 +498,33 @@ class WZMapBuilder(inkex.EffectExtension):
             target = root.find(xpath, NAMESPACES)
         return target
 
-    def _get_or_create_territory_layer(self) -> Optional[inkex.Layer]:
+    def _get_metadata_layer(self, create: bool = False) -> inkex.Layer:
+        """
+        Return the metadata layer node.  If create, will create node if it doesn't exist.
+        :param create:
+        :return:
+        """
+        metadata_layer = self.find(f"./{Svg.GROUP}[@{Inkscape.LABEL}='{MapLayers.METADATA}']")
+        if metadata_layer is None and create:
+            metadata_layer = inkex.Layer.new(MapLayers.METADATA)
+            self.svg.add(metadata_layer)
+        return metadata_layer
+
+    def _get_metadata_type_layer(self, metadata_type: str, create: bool = False) -> inkex.Layer:
+        """
+        Returns the specified metadata layer node. If create, will create node if it doesn't exist.
+        :param metadata_type:
+        :param create:
+        :return:
+        """
+        metadata_layer = self._get_metadata_layer()
+        layer = self.find(f"./{Svg.GROUP}[@{Inkscape.LABEL}='{metadata_type}']", metadata_layer)
+        if layer is None and create:
+            layer = inkex.Layer.new(metadata_type)
+            metadata_layer.add(layer)
+        return layer
+
+    def _get_territory_layer(self, create: bool = False) -> Optional[inkex.Layer]:
         """
         Returns the territory layer. Creates it if it doesn't exist.
         :return:
@@ -511,7 +532,7 @@ class WZMapBuilder(inkex.EffectExtension):
         """
         territory_layer = self.find(f"./{Svg.GROUP}[@{Inkscape.LABEL}='{MapLayers.TERRITORIES}']")
 
-        if territory_layer is None:
+        if territory_layer is None and create:
             territory_layer = inkex.Layer.new(MapLayers.TERRITORIES)
             self.svg.add(territory_layer)
         return territory_layer
@@ -639,10 +660,10 @@ class WZMapBuilder(inkex.EffectExtension):
         bonus_name, bonus_value = bonus_layer.get(get_uri(Inkscape.LABEL)).split(': ')
         return bonus_name, int(bonus_value)
 
-    def _get_or_create_bonus_link_layer(self) -> inkex.Layer:
+    def _get_bonus_link_layer(self, create: bool = False) -> inkex.Layer:
         """Gets the bonus link layer"""
         layer = self.find(f"./{Svg.GROUP}[@{Inkscape.LABEL}='{MapLayers.BONUS_LINKS}']")
-        if layer is None:
+        if layer is None and create:
             layer = inkex.Layer.new(MapLayers.BONUS_LINKS)
             self.svg.add(layer)
         return layer
@@ -666,7 +687,7 @@ class WZMapBuilder(inkex.EffectExtension):
         elif not selected_bonus_links:
             bonus_link = None
         else:
-            raise WarzoneMapBuilderException("Multiple bonus links have been selected.")
+            raise inkex.AbortExtension("Multiple bonus links have been selected.")
         return bonus_link
 
     @staticmethod
@@ -702,27 +723,10 @@ class WZMapBuilder(inkex.EffectExtension):
     # METADATA SETTERS #
     ####################
 
-    def _get_metadata_layer(self, metadata_type: str = None, create: bool = False) -> inkex.Layer:
-        """
-        Returns the specified metadata layer node. If no metadata type provided returns the base
-        metadata mode. If create, will create node if it doesn't exist.
-        :param metadata_type:
-        :param create:
-        :return:
-        """
-        metadata_layer = self.find(f"./{Svg.GROUP}[@{Inkscape.LABEL}='{MapLayers.METADATA}']")
-        if metadata_layer is None:
-            metadata_layer = inkex.Layer.new(MapLayers.METADATA)
-            self.svg.add(metadata_layer)
-
-        if metadata_type:
-            layer = self.find(f"./{Svg.GROUP}[@{Inkscape.LABEL}='{metadata_type}']", metadata_layer)
-            if layer is None and create:
-                layer = inkex.Layer.new(metadata_type)
-                metadata_layer.add(layer)
-        else:
-            layer = metadata_layer
-        return layer
+    def _setup_map_layers(self):
+        self._get_metadata_layer(create=True)
+        self._get_territory_layer(create=True)
+        self._get_bonus_link_layer(create=True)
 
     def create_territory(
             self, territory: inkex.PathElement, max_id: int, territory_layer: inkex.Layer = None
@@ -832,7 +836,7 @@ class WZMapBuilder(inkex.EffectExtension):
             try:
                 bonus_link_style.set_color(self.options.bonus_color)
             except inkex.colors.ColorError:
-                raise WarzoneMapBuilderException(
+                raise inkex.AbortExtension(
                     f"If a bonus color is provided if must be an RGB string in the form '#00EE33'."
                     f" Provided {self.options.bonus_color}"
                 )
@@ -867,7 +871,7 @@ class WZMapBuilder(inkex.EffectExtension):
         self.options.bonus_color = bonus_link_style.get_color()
 
         # Add bonus link to bonus link layer
-        bonus_link_layer = self._get_or_create_bonus_link_layer()
+        bonus_link_layer = self._get_bonus_link_layer()
         if bonus_link.getparent() != bonus_link_layer:
             bonus_link_layer.add(bonus_link)
         return bonus_link
@@ -895,7 +899,7 @@ class WZMapBuilder(inkex.EffectExtension):
 
             # raise exception if layer with new bonus name already exists
             if find_bonus_layers_with_name(self.options.bonus_name):
-                raise WarzoneMapBuilderException(
+                raise inkex.AbortExtension(
                     f"Cannot rename bonus with bonus link to {self.options.bonus_name}. A bonus"
                     f" with that name already exists."
                 )
@@ -909,13 +913,13 @@ class WZMapBuilder(inkex.EffectExtension):
                 matching_layer_names = [
                     self._get_bonus_layer_name_and_value(layer) for layer in matching_bonus_layers
                 ]
-                raise WarzoneMapBuilderException(
+                raise inkex.AbortExtension(
                     f"Multiple bonus layers exist matching bonus link {bonus_link_id}: "
                     f"{matching_layer_names}"
                 )
 
         # get bonuses layer and create if not exists
-        bonuses_layer = self._get_metadata_layer(MapLayers.BONUSES, create=True)
+        bonuses_layer = self._get_metadata_type_layer(MapLayers.BONUSES, create=True)
 
         # get bonus layer for old bonus name and create if not exists
         bonus_layer = self.find(
@@ -925,12 +929,12 @@ class WZMapBuilder(inkex.EffectExtension):
             try:
                 bonus_value = int(self.options.bonus_value)
             except ValueError:
-                raise WarzoneMapBuilderException(
+                raise inkex.AbortExtension(
                     f"If creating a new bonus, a bonus value must be provided as an integer."
                     f" Provided '{self.options.bonus_value}'"
                 )
             if not self.options.bonus_name:
-                raise WarzoneMapBuilderException(
+                raise inkex.AbortExtension(
                     "If no bonus link is selected, a bonus name must be provided."
                 )
             bonus_layer = inkex.Layer.new(f'{self.options.bonus_name}: {bonus_value}')
@@ -943,7 +947,7 @@ class WZMapBuilder(inkex.EffectExtension):
                 )
                 self.options.bonus_value = str(bonus_value)
             except ValueError:
-                raise WarzoneMapBuilderException(
+                raise inkex.AbortExtension(
                     f"If a bonus value is provided it must be an integer."
                     f" Provided {self.options.bonus_value}"
                 )
