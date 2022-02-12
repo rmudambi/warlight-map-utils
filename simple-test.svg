@@ -6,7 +6,7 @@
    version="1.1"
    id="svg71791"
    sodipodi:docname="simple-test.svg"
-   inkscape:version="1.1.1 (1:1.1+202109281949+c3084ef5ed)"
+   inkscape:version="1.1.2 (1:1.1+202202050950+0a00cf5339)"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -34,10 +34,10 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="1.3276712"
-     inkscape:cx="759.6007"
-     inkscape:cy="556.2371"
+     inkscape:cx="1001.0009"
+     inkscape:cy="555.48392"
      inkscape:document-units="px"
-     inkscape:current-layer="layer9"
+     inkscape:current-layer="layer2"
      inkscape:document-rotation="0"
      showgrid="false"
      inkscape:window-width="1684"
@@ -81,27 +81,6 @@
        style="display:inline"
        width="100%"
        height="100%" />
-    <path
-       inkscape:connector-curvature="0"
-       style="display:inline;vector-effect:none;fill:#bf4040;fill-opacity:1;fill-rule:nonzero;stroke:#ffff00;stroke-width:1;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:normal;enable-background:new"
-       d="m 875.5362,570.1639 h 11.7339 c 2.0315,0 3.6669,1.63542 3.6669,3.66683 v 11.73404 c 0,2.03149 -1.6354,3.66698 -3.6669,3.66698 h -11.7339 c -2.0316,0 -3.6671,-1.63549 -3.6671,-3.66698 v -11.73404 c 0,-2.0314 1.6355,-3.66683 3.6671,-3.66683 z"
-       id="BonusLink_Paln"
-       inkscape:label="#rect5596"
-       inkscape:export-xdpi="96"
-       inkscape:export-ydpi="96"
-       sodipodi:nodetypes="sssssssss">
-      <title
-         id="title6054">Paln</title>
-    </path>
-    <rect
-       style="fill:#f2f2f2;fill-opacity:1;fill-rule:evenodd;stroke:#00ff00;stroke-linecap:round;stroke-linejoin:round"
-       id="rect5635"
-       width="20"
-       height="20"
-       x="871.76447"
-       y="570.0592"
-       ry="4"
-       rx="4" />
   </g>
   <g
      inkscape:groupmode="layer"
