@@ -209,17 +209,16 @@ class WZMapBuilder(inkex.EffectExtension):
         else:
             bonus_link = None
 
-        bonus_territories = []
-        for territory in territories:
-            bonus_territories.append(
-                self._create_bonus_territory(territory, bonus_layer)
-            )
-
+        bonus_territories = [inkex.Use.new(territory.getparent(), 0, 0) for territory in territories]
         if self.options.bonus_replace:
             bonus_layer.remove_all()
 
-        # bonus_layer.add(bonus_territories)
-        # todo clone bonus link into layer
+        bonus_layer.add(*bonus_territories)
+        if bonus_link is not None and self.find(
+            f"./{Svg.CLONE}[@{XLink.HREF}='#{bonus_link.get_id()}']", bonus_layer
+        ) is None:
+            bonus_layer.add(inkex.Use.new(bonus_link, 0, 0))
+        # todo metadata layer should be bottom-most layer
         # todo set stroke color of all territories
         # todo reselect original selection
         pass
@@ -954,19 +953,6 @@ class WZMapBuilder(inkex.EffectExtension):
             bonus_layer.set(Inkscape.LABEL, f'{new_bonus_name}: {bonus_value}')
 
         return bonus_layer
-
-    @staticmethod
-    def _create_bonus_territory(
-            territory: inkex.PathElement, bonus_layer: inkex.Layer
-    ) -> inkex.PathElement:
-        """
-
-        :param territory:
-        :param bonus_layer:
-        :return:
-        """
-        # todo create clone
-        return None
 
     @staticmethod
     def create_tspan(bonus_value, font_color: str):

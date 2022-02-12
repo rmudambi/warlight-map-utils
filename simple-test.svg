@@ -9,7 +9,6 @@
    inkscape:version="1.1.2 (1:1.1+202202050950+0a00cf5339)"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns:xlink="http://www.w3.org/1999/xlink"
    xmlns="http://www.w3.org/2000/svg"
    xmlns:svg="http://www.w3.org/2000/svg"
    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
@@ -33,11 +32,11 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="1.3276712"
-     inkscape:cx="1001.0009"
-     inkscape:cy="555.48392"
+     inkscape:zoom="0.93880531"
+     inkscape:cx="1150.9309"
+     inkscape:cy="576.79691"
      inkscape:document-units="px"
-     inkscape:current-layer="layer2"
+     inkscape:current-layer="layer1"
      inkscape:document-rotation="0"
      showgrid="false"
      inkscape:window-width="1684"
@@ -68,20 +67,6 @@
       </cc:Work>
     </rdf:RDF>
   </metadata>
-  <g
-     inkscape:groupmode="layer"
-     id="layer2"
-     inkscape:label="colne"
-     style="display:inline">
-    <use
-       x="0"
-       y="0"
-       xlink:href="#path6249"
-       id="use765"
-       style="display:inline"
-       width="100%"
-       height="100%" />
-  </g>
   <g
      inkscape:groupmode="layer"
      id="layer1"
