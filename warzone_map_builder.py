@@ -214,8 +214,7 @@ class WZMapBuilder(inkex.EffectExtension):
             f"./{Svg.CLONE}[@{XLink.HREF}='#{bonus_link.get_id()}']", bonus_layer
         ) is None:
             bonus_layer.add(inkex.Use.new(bonus_link, 0, 0))
-        # todo set stroke color of all territories
-        # todo reselect original selection
+        self._set_territory_stroke()
         pass
 
     def _upload_metadata(self) -> None:
@@ -640,15 +639,6 @@ class WZMapBuilder(inkex.EffectExtension):
         )
         return bonus_layers
 
-    def _get_bonus_layer_from_bonus_link(self, bonus_link: inkex.PathElement) -> inkex.Layer:
-        """
-
-        :param bonus_link:
-        :return:
-        """
-        # todo get layer from link
-        pass
-
     @staticmethod
     def _get_bonus_layer_name_and_value(bonus_layer: inkex.Layer) -> Tuple[str, int]:
         """
@@ -957,6 +947,32 @@ class WZMapBuilder(inkex.EffectExtension):
             bonus_layer.set(Inkscape.LABEL, f'{new_bonus_name}: {bonus_value}')
 
         return bonus_layer
+
+    def _set_territory_stroke(self) -> None:
+        processed_territory_ids = set()
+        bonus_link_layer = self._get_bonus_link_layer()
+        for bonus_layer in self._get_metadata_type_layers(MapLayers.BONUSES):
+            # get associated bonus link
+            bonus_link_id = self._get_bonus_link_id(
+                self._get_bonus_layer_name_and_value(bonus_layer)[0]
+            )
+            bonus_link: inkex.PathElement = self.find(
+                f"./{Svg.GROUP}/{Svg.PATH}[@{Svg.ID}='{bonus_link_id}']", bonus_link_layer
+            )
+            if bonus_link is None:
+                stroke_color = Color.BLACK
+            else:
+                stroke_color = bonus_link.effective_style().get_color()
+
+            for clone in bonus_layer.getchildren():
+                if clone.get(XLink.HREF) in processed_territory_ids:
+                    continue
+
+                processed_territory_ids.add(clone.get(XLink.HREF))
+                linked_element = clone.href
+                if self._is_territory_group(linked_element):
+                    territory = self.find(f"./{Svg.PATH}", linked_element)
+                    territory.effective_style().set_color(stroke_color, name=Svg.STROKE)
 
     @staticmethod
     def create_tspan(bonus_value, font_color: str):

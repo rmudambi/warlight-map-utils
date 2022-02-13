@@ -25,10 +25,8 @@ Find bonus-less territories
     find all territories in no bonuses
 Find connection-less territories
     find all territories with no connections
-Put existing bonus links in correct layer
 
-Make sure all layers are in the correct order
-    Bonus-links -> Metadata -> Territories -> everything else
+Add option not to set territory stroke colors if that is slow
 
 Create INSS bonus layers from the extension
     input key-value pairs for # of territories and income
