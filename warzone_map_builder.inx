@@ -31,9 +31,10 @@
             <param name="territory_name_territory_layer" type="bool" gui-text="Move this territory to the territory layer">true</param>
         </page>
         <page name="bonus" gui-text="Bonus">
-            <label appearance="header">Create Bonus</label>
+            <label appearance="header">Create or Update Bonus</label>
             <label>
-                Creates or updates a bonus with the given name. Selected territories will be added to the bonus.
+                Creates or updates a bonus with the given name. Selected territories will be added
+                to the bonus.
                 <br/><br/>If the bonus value or color is empty, these attributes of an existing
                 bonus will not be changed. However, an error will be thrown if the bonus does not
                 already exist.
@@ -45,6 +46,19 @@
             <param name="bonus_color" type="string" gui-text="Bonus Color">#000000</param>
             <param name="bonus_link_visible" type="bool" gui-text="Bonus link should be visible">true</param>
             <param name="bonus_replace" type="bool" gui-text="Replace all existing territories in bonus">true</param>
+        </page>
+        <page name="connection" gui-text="Connections">
+            <label appearance="header">Toggle Connection</label>
+            <label>
+                Creates a connection between two selected territories if they are currently not
+                connected and removes the connection if they are. Can create vertically or
+                horizontally wrapping connections.
+            </label>
+            <param name="connection_type" type="optiongroup" appearance="combo" gui-text="Connection Type">
+                <option value="Normal">Normal</option>
+                <option value="WrapHorizontally">Wrap Horizontally</option>
+                <option value="WrapVertically">Wrap Vertically</option>
+            </param>
         </page>
         <page name="upload" gui-text="Upload metadata">
             <label appearance="header">Load Map Metadata to Warzone</label>

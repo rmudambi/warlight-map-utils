@@ -4,12 +4,6 @@ Implement scenario distributions
 
 Create new extension/tab to prepare svg to be uploaded to warzone
 
-Create bonus layers and links from the extension
-    input name and value and select territories
-    checkbox to signify that link should be visible
-    checkbox to overwrite existing territories rather than append
-    allow users to select a bonus link to specify a bonus
-    update bonus colors for territories that were in bonus before or after operation
 Create connection layer entries from the extension
     select a pair of territories
     drop-down for type of connection

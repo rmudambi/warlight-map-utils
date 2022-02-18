@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 import json
 import re
 import requests
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import inkex
 from inkex.utils import debug
@@ -46,9 +46,10 @@ class Svg:
 
 class Inkscape:
     LABEL = 'inkscape:label'
-    GROUP_MODE = 'inkscape:groupmode'
     CONNECTION_START = 'inkscape:connection-start'
     CONNECTION_END = 'inkscape:connection-end'
+    CONNECTOR_CURVATURE = 'inkscape:connector-curvature'
+    CONNECTOR_TYPE = 'inkscape:connector-type'
 
 
 class XLink:
@@ -64,7 +65,7 @@ class MapLayers:
     BONUSES = 'WZ:Bonuses'
     DISTRIBUTION_MODES = 'WZ:DistributionModes'
     CONNECTIONS = 'WZ:Connections'
-    NORMAL_CONNECTIONS = 'Normal'
+    WRAP_NORMAL = 'Normal'
     WRAP_HORIZONTAL = 'WrapHorizontally'
     WRAP_VERTICAL = 'WrapVertically'
 
@@ -72,6 +73,7 @@ class MapLayers:
 class Color:
     BLACK = '#000000'
     WHITE = '#FFFFFF'
+    CONNECTIONS = '#000000'
     TERRITORY_FILL = '#FFFFFF'
     BONUS_LINK_STROKE = '#FFFF00'
 
@@ -109,6 +111,9 @@ class WZMapBuilder(inkex.EffectExtension):
         ap.add_argument("--bonus_link_visible", type=inkex.Boolean, default=True)
         ap.add_argument("--bonus_replace", type=inkex.Boolean, default=True)
 
+        # arguments for set connections
+        ap.add_argument("--connection_type", default='normal')
+
         # arguments for metadata upload
         ap.add_argument("--upload_email", type=str, default='')
         ap.add_argument("--upload_api_token", type=str, default='')
@@ -128,6 +133,7 @@ class WZMapBuilder(inkex.EffectExtension):
             'territories': self._set_territories,
             'territory-name': self._set_territory_name,
             'bonus': self._set_bonus,
+            'connection': self._set_connection,
             'upload': self._upload_metadata,
         }[self.options.tab]()
         return
@@ -145,7 +151,7 @@ class WZMapBuilder(inkex.EffectExtension):
         """
 
         territory_layer = (
-            self._get_territory_layer()
+            self._get_metadata_layer(MapLayers.TERRITORIES)
             if self.options.territories_territory_layer else None
         )
         territories = self._get_territories(self.svg)
@@ -171,7 +177,7 @@ class WZMapBuilder(inkex.EffectExtension):
             return
 
         territory_layer = (
-            self._get_territory_layer()
+            self._get_metadata_layer(MapLayers.TERRITORIES)
             if self.options.territory_name_territory_layer else None
         )
         territory = selected_paths.pop()
@@ -187,7 +193,7 @@ class WZMapBuilder(inkex.EffectExtension):
         """
         bonus_link = self._get_bonus_link_from_selection()
         territories = [
-            self._get_territories(group)[0] for group in self.svg.selection.filter(inkex.Group)
+            self._get_territories(group)[0] for group in self.svg.selection
             if self._is_territory_group(group)
         ]
 
@@ -215,7 +221,33 @@ class WZMapBuilder(inkex.EffectExtension):
         ) is None:
             bonus_layer.add(inkex.Use.new(bonus_link, 0, 0))
         self._set_territory_stroke()
-        pass
+
+    def _set_connection(self) -> None:
+        endpoint_ids = [
+            self.find(f"./{Svg.GROUP}/{Svg.RECTANGLE}", group).get_id()
+            for group in self.svg.selection
+            if self._is_territory_group(group)
+        ]
+
+        if (count := len(endpoint_ids)) != 2:
+            raise inkex.AbortExtension(
+                f"Must have exactly 2 selected territories. {count} territories are selected."
+            )
+
+        connector = inkex.PathElement.new(
+            "", style=inkex.Style(stroke=Color.CONNECTIONS, stroke_width=1.0),
+        )
+
+        connector.set(Inkscape.CONNECTION_START, f'#{endpoint_ids[0]}')
+        connector.set(Inkscape.CONNECTION_END, f'#{endpoint_ids[1]}')
+        connector.set(Inkscape.CONNECTOR_CURVATURE, 0)
+        connector.set(Inkscape.CONNECTOR_TYPE, 'polyline')
+
+        connection_type_layer = self._get_metadata_layer(
+            self.options.connection_type,
+            parent=self._get_metadata_layer(MapLayers.CONNECTIONS)
+        )
+        connection_type_layer.add(connector)
 
     def _upload_metadata(self) -> None:
         commands = self._get_set_metadata_commands()
@@ -497,44 +529,25 @@ class WZMapBuilder(inkex.EffectExtension):
             target = root.find(xpath, NAMESPACES)
         return target
 
-    def _get_metadata_layer(self, create: bool = False) -> inkex.Layer:
-        """
-        Return the metadata layer node.  If create, will create node if it doesn't exist.
-        :param create:
-        :return:
-        """
-        metadata_layer = self.find(f"./{Svg.GROUP}[@{Inkscape.LABEL}='{MapLayers.METADATA}']")
-        if metadata_layer is None and create:
-            metadata_layer = inkex.Layer.new(MapLayers.METADATA)
-            self.svg.add(metadata_layer)
-        return metadata_layer
-
-    def _get_metadata_type_layer(self, metadata_type: str, create: bool = False) -> inkex.Layer:
+    def _get_metadata_layer(
+            self,
+            metadata_type: str = None,
+            create: bool = False,
+            parent: inkex.Layer = None
+    ) -> inkex.Layer:
         """
         Returns the specified metadata layer node. If create, will create node if it doesn't exist.
+        If parent layer not selected, use svg root layer.
         :param metadata_type:
         :param create:
         :return:
         """
-        metadata_layer = self._get_metadata_layer()
-        layer = self.find(f"./{Svg.GROUP}[@{Inkscape.LABEL}='{metadata_type}']", metadata_layer)
+        parent = parent if parent is not None else self.svg
+        layer = self.find(f"./{Svg.GROUP}[@{Inkscape.LABEL}='{metadata_type}']", parent)
         if layer is None and create:
             layer = inkex.Layer.new(metadata_type)
-            metadata_layer.add(layer)
+            parent.add(layer)
         return layer
-
-    def _get_territory_layer(self, create: bool = False) -> Optional[inkex.Layer]:
-        """
-        Returns the territory layer. Creates it if it doesn't exist.
-        :return:
-        territory_layer
-        """
-        territory_layer = self.find(f"./{Svg.GROUP}[@{Inkscape.LABEL}='{MapLayers.TERRITORIES}']")
-
-        if territory_layer is None and create:
-            territory_layer = inkex.Layer.new(MapLayers.TERRITORIES)
-            self.svg.add(territory_layer)
-        return territory_layer
 
     @staticmethod
     def _is_territory_group(group: inkex.ShapeElement) -> bool:
@@ -650,14 +663,6 @@ class WZMapBuilder(inkex.EffectExtension):
         bonus_name, bonus_value = bonus_layer.get(get_uri(Inkscape.LABEL)).split(': ')
         return bonus_name, int(bonus_value)
 
-    def _get_bonus_link_layer(self, create: bool = False) -> inkex.Layer:
-        """Gets the bonus link layer"""
-        layer = self.find(f"./{Svg.GROUP}[@{Inkscape.LABEL}='{MapLayers.BONUS_LINKS}']")
-        if layer is None and create:
-            layer = inkex.Layer.new(MapLayers.BONUS_LINKS)
-            self.svg.add(layer)
-        return layer
-
     def _get_bonus_link_from_selection(self):
         """
         Gets all bonus link paths from selection
@@ -714,9 +719,16 @@ class WZMapBuilder(inkex.EffectExtension):
     ####################
 
     def _setup_map_layers(self):
-        self._get_metadata_layer(create=True)
-        self._get_territory_layer(create=True)
-        self._get_bonus_link_layer(create=True)
+        # todo add distribution layers
+        self._get_metadata_layer(MapLayers.BONUSES, create=True)
+        self._get_metadata_layer(MapLayers.TERRITORIES, create=True)
+
+        connections_layer = self._get_metadata_layer(MapLayers.CONNECTIONS, create=True)
+        self._get_metadata_layer(MapLayers.WRAP_VERTICAL, create=True, parent=connections_layer)
+        self._get_metadata_layer(MapLayers.WRAP_HORIZONTAL, create=True, parent=connections_layer)
+        self._get_metadata_layer(MapLayers.WRAP_NORMAL, create=True, parent=connections_layer)
+
+        self._get_metadata_layer(MapLayers.BONUS_LINKS, create=True)
 
     def create_territory(
             self, territory: inkex.PathElement, max_id: int, territory_layer: inkex.Layer = None
@@ -861,7 +873,7 @@ class WZMapBuilder(inkex.EffectExtension):
         self.options.bonus_color = bonus_link_style.get_color()
 
         # Add bonus link to bonus link layer
-        bonus_link_layer = self._get_bonus_link_layer()
+        bonus_link_layer = self._get_metadata_layer(MapLayers.BONUS_LINKS)
         if bonus_link.getparent() != bonus_link_layer:
             bonus_link_layer.add(bonus_link)
         return bonus_link
@@ -908,8 +920,8 @@ class WZMapBuilder(inkex.EffectExtension):
                     f"{matching_layer_names}"
                 )
 
-        # get bonuses layer and create if not exists
-        bonuses_layer = self._get_metadata_type_layer(MapLayers.BONUSES, create=True)
+        # get bonuses layer
+        bonuses_layer = self._get_metadata_layer(MapLayers.BONUSES)
 
         # get bonus layer for old bonus name and create if not exists
         bonus_layer = self.find(
@@ -950,7 +962,7 @@ class WZMapBuilder(inkex.EffectExtension):
 
     def _set_territory_stroke(self) -> None:
         processed_territory_ids = set()
-        bonus_link_layer = self._get_bonus_link_layer()
+        bonus_link_layer = self._get_metadata_layer(MapLayers.BONUS_LINKS)
         for bonus_layer in self._get_metadata_type_layers(MapLayers.BONUSES):
             # get associated bonus link
             bonus_link_id = self._get_bonus_link_id(
