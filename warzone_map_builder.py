@@ -101,10 +101,12 @@ class WZMapBuilder(inkex.EffectExtension):
 
         # arguments for set bonus
         ap.add_argument("--bonus_name", type=str, default='')
+        ap.add_argument("--bonus_tab", type=str, default='create-update')
+        ap.add_argument("--bonus_create_update_tab", type=str, default='create')
         ap.add_argument("--bonus_value", type=str, default='')
         ap.add_argument("--bonus_color", type=str, default='')
         ap.add_argument("--bonus_link_visible", type=inkex.Boolean, default=True)
-        ap.add_argument("--bonus_replace", type=inkex.Boolean, default=True)
+        ap.add_argument("--bonus_territories_tab", type=str, default='add')
 
         # arguments for set connections
         ap.add_argument("--connection_type", default='normal')
@@ -129,7 +131,16 @@ class WZMapBuilder(inkex.EffectExtension):
                 'create': self._create_territories,
                 'name': self._set_territory_name,
             }[self.options.territory_tab],
-            'bonuses': self._set_bonus,
+            'bonuses': {
+                'create-update': {
+                    'create': self._create_bonus,
+                    'update': self._update_bonus,
+                }[self.options.bonus_create_update_tab],
+                'bonus-territories': {
+                    'add': self._add_territories_to_bonus,
+                    'replace': self._replace_territories_in_bonus,
+                }[self.options.bonus_territories_tab],
+            }[self.options.bonus_tab],
             'connection': self._set_connection,
             'upload': self._upload_metadata,
         }[self.options.tab]()
@@ -191,6 +202,44 @@ class WZMapBuilder(inkex.EffectExtension):
 
         territory_group = create_territory(territory, self.get_max_territory_id(), territory_layer)
         territory_group.add(inkex.Title.new(self.options.territory_name))
+
+    def _create_bonus(self) -> None:
+        """
+        Creates a new bonus layer. Raises an error if bonus layer already exists. Creates a
+        bonus-link if necessary.
+        :return:
+        """
+        # todo
+        pass
+
+    def _update_bonus(self) -> None:
+        """
+        Updates an existing bonus layer specified by a bonus name OR a selected bonus-link. If both
+        are provided the bonus associated with the bonus-link is renamed. Creates or deletes a
+        bonus-link if necessary.
+        :return:
+        """
+        # todo
+        pass
+
+    def _add_territories_to_bonus(self) -> None:
+        """
+        Adds selected territories to bonus layer specified by a bonus name OR a selected bonus-link.
+        Raises an error if both are provided and don't have compatible names.
+        :return:
+        """
+        # todo
+        pass
+
+    def _replace_territories_in_bonus(self) -> None:
+        """
+        Replaces existing territories in bonus layer specified by a bonus name OR a selected
+        bonus-link with the selected territories. Raises an error if both are provided and don't
+        have compatible names.
+        :return:
+        """
+        # todo
+        pass
 
     def _set_bonus(self) -> None:
         """
