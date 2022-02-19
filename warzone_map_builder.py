@@ -3,7 +3,6 @@
 from argparse import ArgumentParser
 import json
 import re
-import requests
 from typing import Dict, List, Tuple, Union
 
 import inkex
@@ -262,6 +261,7 @@ class WZMapBuilder(inkex.EffectExtension):
     ##################
 
     def _post_map_details(self, commands: List[Command]) -> None:
+        import requests
         response = requests.post(
             url=SET_MAP_DETAILS_URL,
             json={

@@ -4,9 +4,6 @@ Implement scenario distributions
 
 Create new extension/tab to prepare svg to be uploaded to warzone
 
-Create connection layer entries from the extension
-    select a pair of territories
-    drop-down for type of connection
 Change territory center point from the extension
     select an ellipse and a territory
     option to reset default
