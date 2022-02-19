@@ -126,10 +126,10 @@ class WZMapBuilder(inkex.EffectExtension):
         {
             'about': (lambda: ''),
             'territories': {
-                'territories': self._set_territories,
-                'territory-name': self._set_territory_name
+                'create': self._create_territories,
+                'name': self._set_territory_name,
             }[self.options.territory_tab],
-            'bonus': self._set_bonus,
+            'bonuses': self._set_bonus,
             'connection': self._set_connection,
             'upload': self._upload_metadata,
         }[self.options.tab]()
@@ -139,7 +139,7 @@ class WZMapBuilder(inkex.EffectExtension):
     # EFFECTS #
     ###########
 
-    def _set_territories(self) -> None:
+    def _create_territories(self) -> None:
         """
         Converts all selected paths to a Warzone Territories by setting a Warzone Territory ID and
         creating a territory group. If process-existing checkbox is checked, validate all existing

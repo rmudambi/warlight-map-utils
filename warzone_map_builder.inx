@@ -12,50 +12,32 @@
         </page>
         <page name="territories" gui-text="Territories">
             <param name="territory_tab" type="notebook">
-                <page name="territories" gui-text="Create Territories">
+                <page name="create" gui-text="Create Territories">
                     <label appearance="header">Converts Paths into Warzone Territories</label>
                     <label>Sets a Warzone Territory ID for all selected path elements. Additionally,
                         adds a center-point with example army numbers. Center-points will be
                         generated for all previously existing Warzone Territories that previously
-                        lacked them.
+                        lacked them.<br/>
                     </label>
                     <param name="territory_process_existing" type="bool"
                            gui-text="Standardize all existing territories">
                         true
                     </param>
                 </page>
-                <page name="territory-name" gui-text="Territory Name">
+                <page name="name" gui-text="Territory Name">
                     <label appearance="header">Set Territory Name</label>
                     <label>Sets the territory name of a selected territory element. If the element
                         is not currently a Warzone Territory, a Warzone Territory ID will be
-                        assigned and a center-point created.
+                        assigned and a center-point created.<br/>
                     </label>
                     <param name="territory_name" type="string" gui-text="Territory Name">
                         Unnamed
                     </param>
                 </page>
             </param>
-            <param name="territory_layer" type="bool"
-                   gui-text="Move territory to WZ:Territories layer">
+            <param name="territory_layer" type="bool" gui-text="Move to WZ:Territories layer">
                 true
             </param>
-        </page>
-        <page name="bonus" gui-text="Bonus">
-            <label appearance="header">Create or Update Bonus</label>
-            <label>
-                Creates or updates a bonus with the given name. Selected territories will be added
-                to the bonus.
-                <br/><br/>If the bonus value or color is empty, these attributes of an existing
-                bonus will not be changed. However, an error will be thrown if the bonus does not
-                already exist.
-                <br/><br/>Optionally may choose to make the bonus link invisible. Also may choose to
-                replace or append to existing territories.
-            </label>
-            <param name="bonus_name" type="string" gui-text="Bonus Name"/>
-            <param name="bonus_value" type="string" gui-text="Bonus Value"/>
-            <param name="bonus_color" type="string" gui-text="Bonus Color">#000000</param>
-            <param name="bonus_link_visible" type="bool" gui-text="Bonus link should be visible">true</param>
-            <param name="bonus_replace" type="bool" gui-text="Replace all existing territories in bonus">true</param>
         </page>
         <page name="connection" gui-text="Connections">
             <label appearance="header">Toggle Connection</label>
@@ -70,7 +52,55 @@
                 <option value="WrapVertically">Wrap Vertically</option>
             </param>
         </page>
-        <page name="upload" gui-text="Upload metadata">
+        <page name="bonuses" gui-text="Bonus">
+            <label appearance="header">Create or Update Bonus</label>
+            <param name="bonus_name" type="string" gui-text="Name"/>
+            <param name="bonus_tab" type="notebook">
+                <page name="create-update" gui-text="Bonus Properties">
+                    <param name="bonus_create_update_tab" type="notebook">
+                        <page name="create" gui-text="Create Bonus">
+                            <label>
+                                Creates a bonus. Must provide a name. If a bonus link is selected
+                                color and value are optional, but if they are provided they will be
+                                applied to the bonus link.
+                            </label>
+                        </page>
+                        <page name="update" gui-text="Update Bonus">
+                            <label>
+                                Updates the bonus corresponding to the selected bonus link. If no
+                                bonus link is selected, updates bonus with the provided name.
+                                <br/><br/>Empty name, value, or color fields will be left unchanged.
+                            </label>
+                        </page>
+                    </param>
+                    <param name="bonus_value" type="string" gui-text="Army Value"/>
+                    <!-- todo change to use color picker -->
+                    <param name="bonus_color" type="string" gui-text="Color">#000000</param>
+                    <param name="bonus_link_visible" type="bool"
+                           gui-text="Bonus link should be visible">true</param>
+                </page>
+                <page name="bonus-territories" gui-text="Bonus Territories">
+                    <param name="bonus_territories_tab" type="notebook">
+                        <page name="add" gui-text="Add Territories">
+                            <label appearance="header">Add Territories to Bonus</label>
+                            <label>
+                                Adds selected territories to the bonus. The bonus name must be provided
+                                or a bonus link must be selected.
+                                <br/><br/>Existing territories will remain in the bonus.
+                            </label>
+                        </page>
+                        <page name="replace" gui-text="Replace Territories">
+                        <label appearance="header">Replace Territories in Bonus</label>
+                            <label>
+                                Replaces all territories in the bonus with the selected territories. The
+                                bonus name must be provided or a bonus link must be selected.
+                            </label>
+                        </page>
+                    </param>
+                </page>
+            </param>
+        </page>
+        <page name="upload" gui-text="Upload Metadata">
             <label appearance="header">Load Map Metadata to Warzone</label>
             <param name="upload_email" type="string" gui-text="Warzone Email Address"/>
             <param name="upload_api_token" type="string" gui-text="Warzone API Token"/>
