@@ -223,10 +223,16 @@ class WZMapBuilder(inkex.EffectExtension):
         self._set_territory_stroke()
 
     def _set_connection(self) -> None:
+        territory_groups = [
+            group for group in self.svg.selection if self._is_territory_group(group)
+        ]
+        territory_groups.extend([
+            element.getparent() for element in self.svg.selection
+            if self._is_territory_group(element.getparent())
+        ])
         endpoint_ids = [
             self.find(f"./{Svg.GROUP}/{Svg.RECTANGLE}", group).get_id()
-            for group in self.svg.selection
-            if self._is_territory_group(group)
+            for group in territory_groups
         ]
 
         if (count := len(endpoint_ids)) != 2:
@@ -565,6 +571,15 @@ class WZMapBuilder(inkex.EffectExtension):
             and len(WZMapBuilder._get_territories(group, is_recursive=False)) == 1
             and len(group.xpath(f"./{Svg.GROUP}[{Svg.RECTANGLE} and {Svg.TEXT}]")) == 1
         )
+
+    @staticmethod
+    def _is_territory(element: inkex.BaseElement) -> bool:
+        """
+        Checks if the given element is a territory
+        :param element:
+        :return:
+        """
+        return Warzone.TERRITORY_IDENTIFIER in element.get_id()
 
     @staticmethod
     def _get_territories(
