@@ -6,23 +6,19 @@ import re
 from typing import Dict, List, Tuple, Union
 
 import inkex
+from inkex import AbortExtension, NSS
 from inkex.utils import debug
 
 
 Command = Dict[str, Union[str, int]]
 
 SET_MAP_DETAILS_URL = 'https://www.warzone.com/API/SetMapDetails'
-NAMESPACES = {
-    'svg': 'http://www.w3.org/2000/svg',
-    'inkscape': 'http://www.inkscape.org/namespaces/inkscape',
-    'xlink': 'http://www.w3.org/1999/xlink',
-}
 
 
 def get_uri(key: str) -> str:
     if ':' in key:
         namespace, key = key.split(':')
-        key = f'{{{NAMESPACES[namespace]}}}{key}'
+        key = f'{{{NSS[namespace]}}}{key}'
     return key
 
 
@@ -166,11 +162,10 @@ class WZMapBuilder(inkex.EffectExtension):
             selected for selected in self.svg.selection.filter(inkex.PathElement)
         ])
         for territory in territories_to_process:
-            max_id = self.create_territory(territory, max_id, territory_layer)
+            territory_group = self.create_territory(territory, max_id, territory_layer)
+            max_id = max(max_id, self._get_territory_id(territory_group))
         if not territories_to_process:
-            raise inkex.AbortExtension(
-                "There are no territories selected. Territories must be paths."
-            )
+            raise AbortExtension("There are no territories selected. Territories must be paths.")
 
     def _set_territory_name(self) -> None:
         """
@@ -178,17 +173,27 @@ class WZMapBuilder(inkex.EffectExtension):
         converts it into one. If territory-layer checkbox is checked, move to the Territories layer.
         :return:
         """
-        selected_paths = self.svg.selection.filter(inkex.PathElement)
-        if len(selected_paths) != 1:
-            raise inkex.AbortExtension("There must be exactly one selected path element.")
+
+        if len(self.svg.selection) != 1:
+            raise AbortExtension("Please select exactly one territory.")
+
+        element = self.svg.selection.pop()
+        if isinstance(element, inkex.PathElement):
+            territory = element
+        elif self._is_territory_group(element):
+            territory = self._get_territories(element, is_recursive=False)[0]
+        else:
+            raise AbortExtension("You must select either a path or an existing territory group.")
 
         territory_layer = (
             self._get_metadata_layer(MapLayers.TERRITORIES)
             if self.options.territory_layer else None
         )
-        territory = selected_paths.pop()
-        territory.add(inkex.Title.new(self.options.territory_name))
-        self.create_territory(territory, self.get_max_territory_id(), territory_layer)
+
+        territory_group = self.create_territory(
+            territory, self.get_max_territory_id(), territory_layer
+        )
+        territory_group.add(inkex.Title.new(self.options.territory_name))
 
     def _set_bonus(self) -> None:
         """
@@ -204,7 +209,7 @@ class WZMapBuilder(inkex.EffectExtension):
         ]
 
         if bonus_link is None and not territories:
-            raise inkex.AbortExtension("No bonus link or territories have been selected.")
+            raise AbortExtension("No bonus link or territories have been selected.")
 
         self.svg.selection.set(*territories)
 
@@ -242,7 +247,7 @@ class WZMapBuilder(inkex.EffectExtension):
         ]
 
         if (count := len(endpoint_ids)) != 2:
-            raise inkex.AbortExtension(
+            raise AbortExtension(
                 f"Must have exactly 2 selected territories. {count} territories are selected."
             )
 
@@ -318,7 +323,7 @@ class WZMapBuilder(inkex.EffectExtension):
         territories = self.svg.xpath(
             # todo look only in territory layer
             f".//{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}') and {Svg.TITLE}]",
-            namespaces=NAMESPACES
+            namespaces=NSS
         )
 
         commands = [
@@ -343,15 +348,15 @@ class WZMapBuilder(inkex.EffectExtension):
             f"  {Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}')]"
             f"  and .//{Svg.ELLIPSE}"
             f"]",
-            namespaces=NAMESPACES
+            namespaces=NSS
         )
 
         commands = []
         for group in groups:
-            territory = group.find(f"./{Svg.PATH}", NAMESPACES)
+            territory = group.find(f"./{Svg.PATH}", NSS)
             territory_id = self._get_territory_id(territory)
             # todo account for matrix transformations in getting center point
-            center_ellipse: inkex.Ellipse = group.find(f"./{Svg.ELLIPSE}", NAMESPACES)
+            center_ellipse: inkex.Ellipse = group.find(f"./{Svg.ELLIPSE}", NSS)
             x, y = center_ellipse.center
             command = {
                 'command': 'setTerritoryCenterPoint',
@@ -387,7 +392,7 @@ class WZMapBuilder(inkex.EffectExtension):
                     territory = self.svg.xpath(
                         f".//*[@{Svg.ID}='{link_id}']"
                         f"/{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}')]",
-                        namespaces=NAMESPACES
+                        namespaces=NSS
                     )[0]
                     return self._get_territory_id(territory.get(Svg.ID))
 
@@ -417,7 +422,7 @@ class WZMapBuilder(inkex.EffectExtension):
             bonus_link.get(Svg.ID): bonus_link
             for bonus_link in self.svg.xpath(
                 f".//{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.BONUS_LINK_IDENTIFIER}')]",
-                namespaces=NAMESPACES
+                namespaces=NSS
             )
         }
         bonus_layer_nodes = self._get_metadata_type_layers(MapLayers.BONUSES)
@@ -461,7 +466,7 @@ class WZMapBuilder(inkex.EffectExtension):
                 'id': self._get_territory_id(territory),
                 'bonusName': self._get_bonus_layer_name_and_value(bonus_layer)[0]
             } for bonus_layer in bonus_layers
-            for territory in bonus_layer.xpath(f"./{Svg.CLONE}", namespaces=NAMESPACES)
+            for territory in bonus_layer.xpath(f"./{Svg.CLONE}", namespaces=NSS)
         ]
         return commands
 
@@ -515,7 +520,7 @@ class WZMapBuilder(inkex.EffectExtension):
                 'id': self._get_territory_id(territory),
                 'distributionName': distribution_mode_layer.get(get_uri(Inkscape.LABEL))
             } for distribution_mode_layer in distribution_mode_layers
-            for territory in distribution_mode_layer.xpath(f"./{Svg.CLONE}", namespaces=NAMESPACES)
+            for territory in distribution_mode_layer.xpath(f"./{Svg.CLONE}", namespaces=NSS)
         ]
         return commands
 
@@ -534,12 +539,12 @@ class WZMapBuilder(inkex.EffectExtension):
         if root is None:
             root = self.svg
         if 'contains(' in xpath:
-            if target := root.xpath(xpath, NAMESPACES):
+            if target := root.xpath(xpath, NSS):
                 target = target[0]
             else:
                 target = None
         else:
-            target = root.find(xpath, NAMESPACES)
+            target = root.find(xpath, NSS)
         return target
 
     def _get_metadata_layer(
@@ -602,30 +607,32 @@ class WZMapBuilder(inkex.EffectExtension):
         slash = '//' if is_recursive else '/'
         return root.xpath(
             f".{slash}{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}')]",
-            # todo see if we can remove this argument
-            namespaces=NAMESPACES
+            namespaces=NSS
         )
 
     @staticmethod
-    def _get_territory_id(territory: Union[str,  inkex.PathElement, inkex.Use]) -> int:
+    def _get_territory_id(territory: Union[str,  inkex.PathElement, inkex.Use, inkex.Group]) -> int:
         """
         Returns the id of the territory. If the argument is a string it must be of the form
         'Territory_X'. If the argument is a territory, it gets the int part of the element's id. If
-        it is a clone, it get the int part of the id of the linked element.
+        it is a clone, it gets the int part of the id of the linked element.
         :param territory:
         :return:
         territory id as required by the Warzone API
         """
-        # todo support territory group?
         if isinstance(territory, str):
             territory_id = territory.split(Warzone.TERRITORY_IDENTIFIER)[-1]
         elif isinstance(territory, inkex.PathElement):
             territory_id = WZMapBuilder._get_territory_id(territory.get(Svg.ID))
+        elif isinstance(territory, inkex.Group) and WZMapBuilder._is_territory_group(territory):
+            territory_id = WZMapBuilder._get_territory_id(
+                WZMapBuilder._get_territories(territory, is_recursive=False)[0]
+            )
         elif isinstance(territory, inkex.Use):
             territory_id = WZMapBuilder._get_territory_id(territory.get(get_uri(XLink.HREF)))
         else:
             raise ValueError(f'Element {territory} is not a valid territory element. It must be a'
-                             f' path or a clone.')
+                             f' territory path, a territory group or a territory clone.')
         return int(territory_id)
 
     @staticmethod
@@ -637,7 +644,7 @@ class WZMapBuilder(inkex.EffectExtension):
         :return:
         territory name
         """
-        title = territory.find(Svg.TITLE, NAMESPACES)
+        title = territory.find(Svg.TITLE, NSS)
         if title is not None:
             territory_name = title.text
         else:
@@ -670,7 +677,7 @@ class WZMapBuilder(inkex.EffectExtension):
             f"./{Svg.GROUP}[@{Inkscape.LABEL}='{MapLayers.METADATA}']"
             f"/{Svg.GROUP}[@{Inkscape.LABEL}='{metadata_type}']"
             f"{slash}{Svg.GROUP}[@{Inkscape.LABEL}]",
-            namespaces=NAMESPACES
+            namespaces=NSS
         )
         return bonus_layers
 
@@ -704,7 +711,7 @@ class WZMapBuilder(inkex.EffectExtension):
         elif not selected_bonus_links:
             bonus_link = None
         else:
-            raise inkex.AbortExtension("Multiple bonus links have been selected.")
+            raise AbortExtension("Multiple bonus links have been selected.")
         return bonus_link
 
     @staticmethod
@@ -730,10 +737,9 @@ class WZMapBuilder(inkex.EffectExtension):
             and not isinstance(group, inkex.Layer)
             and len(group.getchildren()) == 2
             and (len(group.xpath(
-                    f"./{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.BONUS_LINK_IDENTIFIER}')]",
-                    NAMESPACES
+                    f"./{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.BONUS_LINK_IDENTIFIER}')]", NSS
                 )) == 1)
-            and (group.find(f"./{Svg.TEXT}", NAMESPACES) is not None)
+            and (group.find(f"./{Svg.TEXT}", NSS) is not None)
         )
 
     ####################
@@ -754,7 +760,7 @@ class WZMapBuilder(inkex.EffectExtension):
 
     def create_territory(
             self, territory: inkex.PathElement, max_id: int, territory_layer: inkex.Layer = None
-    ) -> int:
+    ) -> inkex.Group:
         """
         Converts territory path into a Warzone Territory.
 
@@ -787,7 +793,7 @@ class WZMapBuilder(inkex.EffectExtension):
         destination = territory_layer if territory_layer is not None else parent
         if territory_group not in destination:
             destination.add(territory_group)
-        return max_id
+        return territory_group
 
     @staticmethod
     def _create_center_point_group(territory: Union[inkex.Group, inkex.PathElement]) -> inkex.Group:
@@ -860,7 +866,7 @@ class WZMapBuilder(inkex.EffectExtension):
             try:
                 bonus_link_style.set_color(self.options.bonus_color)
             except inkex.colors.ColorError:
-                raise inkex.AbortExtension(
+                raise AbortExtension(
                     f"If a bonus color is provided if must be an RGB string in the form '#00EE33'."
                     f" Provided {self.options.bonus_color}"
                 )
@@ -923,7 +929,7 @@ class WZMapBuilder(inkex.EffectExtension):
 
             # raise exception if layer with new bonus name already exists
             if find_bonus_layers_with_name(self.options.bonus_name):
-                raise inkex.AbortExtension(
+                raise AbortExtension(
                     f"Cannot rename bonus with bonus link to {self.options.bonus_name}. A bonus"
                     f" with that name already exists."
                 )
@@ -937,7 +943,7 @@ class WZMapBuilder(inkex.EffectExtension):
                 matching_layer_names = [
                     self._get_bonus_layer_name_and_value(layer) for layer in matching_bonus_layers
                 ]
-                raise inkex.AbortExtension(
+                raise AbortExtension(
                     f"Multiple bonus layers exist matching bonus link {bonus_link_id}: "
                     f"{matching_layer_names}"
                 )
@@ -953,14 +959,12 @@ class WZMapBuilder(inkex.EffectExtension):
             try:
                 bonus_value = int(self.options.bonus_value)
             except ValueError:
-                raise inkex.AbortExtension(
+                raise AbortExtension(
                     f"If creating a new bonus, a bonus value must be provided as an integer."
                     f" Provided '{self.options.bonus_value}'"
                 )
             if not self.options.bonus_name:
-                raise inkex.AbortExtension(
-                    "If no bonus link is selected, a bonus name must be provided."
-                )
+                raise AbortExtension("If no bonus link is selected, a bonus name must be provided.")
             bonus_layer = inkex.Layer.new(f'{self.options.bonus_name}: {bonus_value}')
             bonuses_layer.add(bonus_layer)
         else:
@@ -971,7 +975,7 @@ class WZMapBuilder(inkex.EffectExtension):
                 )
                 self.options.bonus_value = str(bonus_value)
             except ValueError:
-                raise inkex.AbortExtension(
+                raise AbortExtension(
                     f"If a bonus value is provided it must be an integer."
                     f" Provided {self.options.bonus_value}"
                 )
