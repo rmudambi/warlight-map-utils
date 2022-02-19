@@ -159,11 +159,10 @@ class WZMapBuilder(inkex.EffectExtension):
         territories += [selected for selected in self.svg.selection.filter(inkex.PathElement)]
         for territory in territories:
             max_id = self.create_territory(territory, max_id, territory_layer)
-        if not self.svg.selected:
-            debug("There are no territories selected. Territories must be paths.")
-        if self.options.territories_territory_layer:
-            debug(f"All existing paths with valid Warzone Territory IDs were moved to the "
-                  f"{MapLayers.TERRITORIES} layer.")
+        if not self.svg.selected and not self.options.territories_territory_layer:
+            raise inkex.AbortExtension(
+                "There are no territories selected. Territories must be paths."
+            )
 
     def _set_territory_name(self) -> None:
         """
@@ -173,8 +172,7 @@ class WZMapBuilder(inkex.EffectExtension):
         """
         selected_paths = self.svg.selection.filter(inkex.PathElement)
         if len(selected_paths) != 1:
-            debug("There must be exactly one selected path element.")
-            return
+            raise inkex.AbortExtension("There must be exactly one selected path element.")
 
         territory_layer = (
             self._get_metadata_layer(MapLayers.TERRITORIES)
