@@ -10,25 +10,35 @@
                 Warzone Map Editor, enabling users define their map entirely in the svg file.
             </label>
         </page>
-        <page name="territories" gui-text="Set Territories">
-            <label appearance="header">Set Paths as Warzone Territories</label>
-            <label>Sets a Warzone Territory ID for all selected path elements. Additionally, adds a
-                center-point with example army numbers. Center-points will be generated for all
-                previously existing Warzone Territories that previously lacked them.
-                <br/><br/>Provides the option of moving all Warzone Territories to a single layer
-                WZ:Territories.
-            </label>
-            <param name="territories_territory_layer" type="bool" gui-text="Collect all territories into single layer">true</param>
-        </page>
-        <page name="territory-name" gui-text="Set Territory Name">
-            <label appearance="header">Set Territory Name</label>
-            <label>Sets the name of a selected path which is intended as a Warzone Territory. If the
-                path does not currently have a Warzone Territory ID of center-point, these are
-                created.
-                <br/><br/>Provides the option of moving this territory to a WZ:Territories layer.
-            </label>
-            <param name="territory_name" type="string" gui-text="Territory Name">Unnamed</param>
-            <param name="territory_name_territory_layer" type="bool" gui-text="Move this territory to the territory layer">true</param>
+        <page name="territories" gui-text="Territories">
+            <param name="territory_tab" type="notebook">
+                <page name="territories" gui-text="Create Territories">
+                    <label appearance="header">Converts Paths into Warzone Territories</label>
+                    <label>Sets a Warzone Territory ID for all selected path elements. Additionally,
+                        adds a center-point with example army numbers. Center-points will be
+                        generated for all previously existing Warzone Territories that previously
+                        lacked them.
+                    </label>
+                    <param name="territory_process_existing" type="bool"
+                           gui-text="Standardize all existing territories">
+                        true
+                    </param>
+                </page>
+                <page name="territory-name" gui-text="Territory Name">
+                    <label appearance="header">Set Territory Name</label>
+                    <label>Sets the territory name of a selected territory element. If the element
+                        is not currently a Warzone Territory, a Warzone Territory ID will be
+                        assigned and a center-point created.
+                    </label>
+                    <param name="territory_name" type="string" gui-text="Territory Name">
+                        Unnamed
+                    </param>
+                </page>
+            </param>
+            <param name="territory_layer" type="bool"
+                   gui-text="Move territory to WZ:Territories layer">
+                true
+            </param>
         </page>
         <page name="bonus" gui-text="Bonus">
             <label appearance="header">Create or Update Bonus</label>

@@ -96,12 +96,12 @@ class WZMapBuilder(inkex.EffectExtension):
     def add_arguments(self, ap: ArgumentParser) -> None:
         ap.add_argument("--tab", type=str, default='about')
 
-        # arguments for set territories
-        ap.add_argument("--territories_territory_layer", type=inkex.Boolean, default=True)
+        # arguments for territories
+        ap.add_argument("--territory_tab", type=str, default='territories')
 
-        # arguments for set territory name
+        ap.add_argument("--territory_process_existing", type=inkex.Boolean, default=True)
         ap.add_argument("--territory_name", type=str, default=Warzone.UNNAMED_TERRITORY_NAME)
-        ap.add_argument("--territory_name_territory_layer", type=inkex.Boolean, default=True)
+        ap.add_argument("--territory_layer", type=inkex.Boolean, default=True)
 
         # arguments for set bonus
         ap.add_argument("--bonus_name", type=str, default='')
@@ -129,8 +129,10 @@ class WZMapBuilder(inkex.EffectExtension):
         self._setup_map_layers()
         {
             'about': (lambda: ''),
-            'territories': self._set_territories,
-            'territory-name': self._set_territory_name,
+            'territories': {
+                'territories': self._set_territories,
+                'territory-name': self._set_territory_name
+            }[self.options.territory_tab],
             'bonus': self._set_bonus,
             'connection': self._set_connection,
             'upload': self._upload_metadata,
@@ -144,21 +146,28 @@ class WZMapBuilder(inkex.EffectExtension):
     def _set_territories(self) -> None:
         """
         Converts all selected paths to a Warzone Territories by setting a Warzone Territory ID and
-        creating a territory group. If territory-layer checkbox is checked, move all existing
+        creating a territory group. If process-existing checkbox is checked, validate all existing
+        territories as well as selected paths. If territory-layer checkbox is checked, move
         territories to the Territories layer.
         :return:
         """
 
         territory_layer = (
             self._get_metadata_layer(MapLayers.TERRITORIES)
-            if self.options.territories_territory_layer else None
+            if self.options.territory_layer else None
         )
-        territories = self._get_territories(self.svg)
-        max_id = self.get_max_territory_id(territories)
-        territories += [selected for selected in self.svg.selection.filter(inkex.PathElement)]
-        for territory in territories:
+        existing_territories = self._get_territories(self.svg)
+        max_id = self.get_max_territory_id(existing_territories)
+        territories_to_process = (
+            existing_territories if self.options.territory_process_existing else []
+        )
+
+        territories_to_process.extend([
+            selected for selected in self.svg.selection.filter(inkex.PathElement)
+        ])
+        for territory in territories_to_process:
             max_id = self.create_territory(territory, max_id, territory_layer)
-        if not self.svg.selected and not self.options.territories_territory_layer:
+        if not territories_to_process:
             raise inkex.AbortExtension(
                 "There are no territories selected. Territories must be paths."
             )
@@ -175,7 +184,7 @@ class WZMapBuilder(inkex.EffectExtension):
 
         territory_layer = (
             self._get_metadata_layer(MapLayers.TERRITORIES)
-            if self.options.territory_name_territory_layer else None
+            if self.options.territory_layer else None
         )
         territory = selected_paths.pop()
         territory.add(inkex.Title.new(self.options.territory_name))
@@ -775,7 +784,7 @@ class WZMapBuilder(inkex.EffectExtension):
         territory_style[Svg.STROKE_WIDTH] = 1
         if territory_style.get_color() != Color.TERRITORY_FILL:
             territory_style.set_color(Color.TERRITORY_FILL)
-        destination = territory_layer if self.options.territories_territory_layer else parent
+        destination = territory_layer if territory_layer is not None else parent
         if territory_group not in destination:
             destination.add(territory_group)
         return max_id
