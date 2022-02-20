@@ -126,8 +126,8 @@ class WZMapBuilder(inkex.EffectExtension):
 
     def effect(self) -> None:
         self._setup_map_layers()
-        {
-            'about': (lambda: ''),
+        return {
+            'about': None,
             'territories': {
                 'create': self._create_territories,
                 'name': self._set_territory_name,
@@ -139,13 +139,12 @@ class WZMapBuilder(inkex.EffectExtension):
                 }[self.options.bonus_create_update_tab],
                 'bonus-territories': {
                     'add': self._add_territories_to_bonus,
-                    'replace': self._replace_territories_in_bonus,
+                    'replace': self._add_territories_to_bonus,
                 }[self.options.bonus_territories_tab],
             }[self.options.bonus_tab],
             'connection': self._set_connection,
             'upload': self._upload_metadata,
         }[self.options.tab]()
-        return
 
     ###########
     # EFFECTS #
@@ -205,82 +204,109 @@ class WZMapBuilder(inkex.EffectExtension):
         territory_group.add(inkex.Title.new(self.options.territory_name))
 
     def _create_bonus(self) -> None:
+        self._set_bonus_attributes(is_create=True)
+
+    def _update_bonus(self) -> None:
+        self._set_bonus_attributes(is_create=False)
+        self._set_territory_stroke()
+
+    def _set_bonus_attributes(self, is_create: bool) -> None:
         """
-        Creates a new bonus layer. Raises an error if bonus layer already exists. Creates a
+        Updates an existing bonus layer specified by a bonus name OR a selected bonus-link. If both
+        are provided the bonus associated with the bonus-link is renamed. Creates or deletes a
         bonus-link if necessary.
+
+        Creates or updates a bonus layer specified by a bonus name OR a selected bonus-link. If both
+        are provided the bonus associated with the bonus-link is renamed. Raises an error if bonus
+        name is changed and target layer already exists. Creates a bonus-link if necessary.
         :return:
         """
         bonus_name = self.options.bonus_name
-        if not bonus_name:
-            raise AbortExtension("Must provide a bonus name when creating a new bonus.")
-        
+        bonus_value = self.options.bonus_value
         selected_bonus_link = self._get_bonus_link_from_selection()
-
-        if (
-            selected_bonus_link is not None
+        rename_bonus = (
+            bonus_name and selected_bonus_link is not None
             and get_bonus_link_id(bonus_name) != selected_bonus_link.get_id()
-        ):
+        )
+
+        if is_create and not bonus_name:
+            raise AbortExtension("Must provide a bonus name when creating a new bonus.")
+
+        if is_create and rename_bonus:
             raise AbortExtension(
                 f"Bonus name ({bonus_name}) is not consistent with the selected bonus link"
                 f" ({selected_bonus_link.get_id()})."
             )
+
+        if not bonus_name and selected_bonus_link is None:
+            raise AbortExtension(
+                "Either a bonus name must be provided or a bonus link must be selected."
+            )
+
         if selected_bonus_link is None:
             bonus_link = self._get_bonus_link_from_name(bonus_name)
         else:
             bonus_link = selected_bonus_link
-        
-        if existing_layers := self._get_bonus_layers_with_name(bonus_name):
-            raise AbortExtension(
-                f"Cannot create bonus {bonus_name} as bonus layers for this name already exist:"
-                f" {[layer.get(Inkscape.LABEL) for layer in existing_layers]}"
-            )
 
+        if rename_bonus:
+            if existing_layers := self._get_bonus_layers_with_name(bonus_name):
+                raise AbortExtension(
+                    f"Cannot create bonus {bonus_name} as bonus layers for this name already exist:"
+                    f" {[layer.get(Inkscape.LABEL) for layer in existing_layers]}"
+                )
+
+        if not bonus_name or rename_bonus:
+            old_bonus_name = bonus_link.get_id().split(Warzone.BONUS_LINK_IDENTIFIER)[-1]
+        else:
+            old_bonus_name = bonus_name
+
+        # todo verify that input color is a valid color
         bonus_color = (
             self.options.bonus_color if self.options.bonus_color
             else bonus_link.effective_style().get_color() if bonus_link is not None
             else Color.DEFAULT_BONUS_COLOR
         )
-        
+
         try:
-            bonus_value = self.options.bonus_value
-            int(bonus_value)
+            if bonus_value != '':
+                int(bonus_value)
         except ValueError:
             raise AbortExtension(
-                f"An integer bonus value must be provided when creating a bonus."
-                f" Provided {self.options.bonus_value}"
+                f"If a bonus value is provided it must be an integer. Provided {bonus_value}"
             )
 
-        bonus_layer = inkex.Layer.new(f'{bonus_name}: {bonus_value}')
-        bonus_layer.add(inkex.Title.new(bonus_color))
-        self._get_metadata_layer(MapLayers.BONUSES).add(bonus_layer)
+        if is_create:
+            if bonus_value == '':
+                raise AbortExtension(f"Must provide a bonus value when creating a new bonus.")
+            bonus_layer = inkex.Layer.new(f'{bonus_name}: {bonus_value}')
+            bonus_layer.add(inkex.Title.new(bonus_color))
+            self._get_metadata_layer(MapLayers.BONUSES).add(bonus_layer)
+        else:
+            debug(f'obn: {old_bonus_name}')
+            bonus_layers = self._get_bonus_layers_with_name(old_bonus_name)
+            if not bonus_layers:
+                raise AbortExtension("Cannot update non-existent bonus.")
+            elif len(bonus_layers) > 1:
+                raise AbortExtension(
+                    f"Too many bonus layers match the bonus name {old_bonus_name}:"
+                    f" {[layer.get(Inkscape.LABEL) for layer in bonus_layers]}"
+                )
+
+            bonus_layer = bonus_layers[0]
+            old_name, old_value = get_bonus_layer_name_and_value(bonus_layer)
+            bonus_name = bonus_name if rename_bonus else old_name
+            bonus_value = bonus_value if bonus_value else old_value
+            bonus_layer.set(Inkscape.LABEL, f'{bonus_name}: {bonus_value}')
+            self.find(Svg.TITLE, bonus_layer).text = bonus_color
 
         if self.options.bonus_link_visible:
-            # todo figure out a good way to position a new bonus link
             bonus_link = self._set_bonus_link(bonus_link, bonus_name, bonus_value, bonus_color)
             if find_clone(bonus_link, bonus_layer) is None:
                 bonus_layer.add(inkex.Use.new(bonus_link, 0, 0))
         else:
             remove_bonus_link(bonus_link)
 
-    def _update_bonus(self) -> None:
-        """
-        Updates an existing bonus layer specified by a bonus name OR a selected bonus-link. If both
-        are provided the bonus associated with the bonus-link is renamed. Creates or deletes a
-        bonus-link if necessary.
-        :return:
-        """
-        # todo get bonus link from selection
-        # todo get bonus link from name
-        # todo if bonus-link or bonus name don't match and bonus layer exists for bonus name, throw error
-        # todo get bonus color from input/bonus-link
-        # todo get bonus value from input/bonus-link
-        # todo update bonus layer name/value/color
-        # todo create/update/delete bonus-link if needed
-        # todo clone bonus-link into layer if needed
-        # todo update stroke colors for territories already in this bonus
-        pass
-
-    def _add_territories_to_bonus(self) -> None:
+    def _add_territories_to_bonus(self, replace: bool) -> None:
         """
         Adds selected territories to bonus layer specified by a bonus name OR a selected bonus-link.
         Raises an error if both are provided and don't have compatible names.
@@ -696,8 +722,7 @@ class WZMapBuilder(inkex.EffectExtension):
         """
         slash = '//' if is_recursive else '/'
         bonus_layers = self.svg.xpath(
-            f"./{Svg.GROUP}[@{Inkscape.LABEL}='{MapLayers.METADATA}']"
-            f"/{Svg.GROUP}[@{Inkscape.LABEL}='{metadata_type}']"
+            f"./{Svg.GROUP}[@{Inkscape.LABEL}='{metadata_type}']"
             f"{slash}{Svg.GROUP}[@{Inkscape.LABEL}]",
             namespaces=NSS
         )
@@ -727,6 +752,7 @@ class WZMapBuilder(inkex.EffectExtension):
         exception if there is more than one.
         :return:
         """
+        debug(f's: {self.svg.selection}')
         selected_bonus_links = [
             self.find(f"./{Svg.PATH}", group)
             for group in self.svg.selection.filter(inkex.Group) if is_bonus_link_group(group)
@@ -785,7 +811,11 @@ class WZMapBuilder(inkex.EffectExtension):
 
         # Create bonus link path if it does not exist
         if bonus_link_path is None:
-            location = self.svg.selection.bounding_box().center
+            # todo figure out a good way to position a new bonus link
+            location = (
+                self.svg.selection.bounding_box().center if self.svg.selection.bounding_box()
+                else self.svg.get_page_bbox().center
+            )
             bonus_link_path = inkex.Rectangle.new(
                 left=location.x - Warzone.BONUS_LINK_SIDE / 2,
                 top=location.y - Warzone.BONUS_LINK_SIDE / 2,
@@ -1077,15 +1107,23 @@ def is_bonus_link_group(group: inkex.ShapeElement) -> bool:
     :param group:
     :return:
     """
-    return (
-        isinstance(group, inkex.Group)
-        and not isinstance(group, inkex.Layer)
-        and len(group.getchildren()) == 2
-        and (len(group.xpath(
-                f"./{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.BONUS_LINK_IDENTIFIER}')]", NSS
-            )) == 1)
-        and (group.find(f"./{Svg.TEXT}", NSS) is not None)
-    )
+    debug(f'blgc: {[c.get_id() for c in group.getchildren()]}')
+    validating = isinstance(group, inkex.Group)
+    i = 0
+    debug(f'v{i}: {validating}')
+    validating &= not isinstance(group, inkex.Layer)
+    i += 1
+    debug(f'v{i}: {validating}')
+    validating &= len(group.getchildren()) == 2
+    i += 1
+    debug(f'v{i}: {validating}')
+    validating &= find(f"./{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.BONUS_LINK_IDENTIFIER}')]", group) is not None
+    i += 1
+    debug(f'v{i}: {validating}')
+    validating &= find(f"./{Svg.TEXT}", group) is not None
+    i += 1
+    debug(f'v{i}: {validating}')
+    return validating
 
 
 def create_territory(
