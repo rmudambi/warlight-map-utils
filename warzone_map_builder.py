@@ -157,7 +157,7 @@ class WZMapBuilder(inkex.EffectExtension):
         territories_to_process = (
             set(existing_territories) if self.options.territory_process_existing else set()
         )
-        territories_to_process.union({
+        territories_to_process = territories_to_process.union({
             selected for selected in self.svg.selection.filter(inkex.PathElement)
         })
         for territory in territories_to_process:
