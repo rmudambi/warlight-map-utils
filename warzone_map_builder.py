@@ -152,7 +152,7 @@ class WZMapBuilder(inkex.EffectExtension):
             self._get_metadata_layer(MapLayers.TERRITORIES)
             if self.options.territory_layer else None
         )
-        existing_territories = self._get_territories(self.svg)
+        existing_territories = get_territories(self.svg)
         max_id = self.get_max_territory_id(existing_territories)
         territories_to_process = (
             existing_territories if self.options.territory_process_existing else []
@@ -162,8 +162,8 @@ class WZMapBuilder(inkex.EffectExtension):
             selected for selected in self.svg.selection.filter(inkex.PathElement)
         ])
         for territory in territories_to_process:
-            territory_group = self.create_territory(territory, max_id, territory_layer)
-            max_id = max(max_id, self._get_territory_id(territory_group))
+            territory_group = create_territory(territory, max_id, territory_layer)
+            max_id = max(max_id, get_territory_id(territory_group))
         if not territories_to_process:
             raise AbortExtension("There are no territories selected. Territories must be paths.")
 
@@ -180,8 +180,8 @@ class WZMapBuilder(inkex.EffectExtension):
         element = self.svg.selection.pop()
         if isinstance(element, inkex.PathElement):
             territory = element
-        elif self._is_territory_group(element):
-            territory = self._get_territories(element, is_recursive=False)[0]
+        elif is_territory_group(element):
+            territory = get_territories(element, is_recursive=False)[0]
         else:
             raise AbortExtension("You must select either a path or an existing territory group.")
 
@@ -190,9 +190,7 @@ class WZMapBuilder(inkex.EffectExtension):
             if self.options.territory_layer else None
         )
 
-        territory_group = self.create_territory(
-            territory, self.get_max_territory_id(), territory_layer
-        )
+        territory_group = create_territory(territory, self.get_max_territory_id(), territory_layer)
         territory_group.add(inkex.Title.new(self.options.territory_name))
 
     def _set_bonus(self) -> None:
@@ -204,8 +202,7 @@ class WZMapBuilder(inkex.EffectExtension):
         """
         bonus_link = self._get_bonus_link_from_selection()
         territories = [
-            self._get_territories(group)[0] for group in self.svg.selection
-            if self._is_territory_group(group)
+            get_territories(group)[0] for group in self.svg.selection if is_territory_group(group)
         ]
 
         if bonus_link is None and not territories:
@@ -234,12 +231,10 @@ class WZMapBuilder(inkex.EffectExtension):
         self._set_territory_stroke()
 
     def _set_connection(self) -> None:
-        territory_groups = [
-            group for group in self.svg.selection if self._is_territory_group(group)
-        ]
+        territory_groups = [group for group in self.svg.selection if is_territory_group(group)]
         territory_groups.extend([
             element.getparent() for element in self.svg.selection
-            if self._is_territory_group(element.getparent())
+            if is_territory_group(element.getparent())
         ])
         endpoint_ids = [
             self.find(f"./{Svg.GROUP}/{Svg.RECTANGLE}", group).get_id()
@@ -329,8 +324,8 @@ class WZMapBuilder(inkex.EffectExtension):
         commands = [
             {
                 'command': 'setTerritoryName',
-                'id': self._get_territory_id(territory),
-                'name': self._get_territory_name(territory)
+                'id': get_territory_id(territory),
+                'name': get_territory_name(territory)
             } for territory in territories
         ]
         return commands
@@ -354,7 +349,7 @@ class WZMapBuilder(inkex.EffectExtension):
         commands = []
         for group in groups:
             territory = group.find(f"./{Svg.PATH}", NSS)
-            territory_id = self._get_territory_id(territory)
+            territory_id = get_territory_id(territory)
             # todo account for matrix transformations in getting center point
             center_ellipse: inkex.Ellipse = group.find(f"./{Svg.ELLIPSE}", NSS)
             x, y = center_ellipse.center
@@ -382,7 +377,7 @@ class WZMapBuilder(inkex.EffectExtension):
         commands = []
         for connection_type_layer in connection_type_layers:
             for connection_layer in connection_type_layer:
-                def get_territory_id(attribute: str) -> int:
+                def local_get_territory_id(attribute: str) -> int:
                     link_id = connection_layer.get(get_uri(attribute))[1:]
                     # todo handle top-level territories
                     #  - currently only works if territory node is one layer below linked node
@@ -394,12 +389,12 @@ class WZMapBuilder(inkex.EffectExtension):
                         f"/{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}')]",
                         namespaces=NSS
                     )[0]
-                    return self._get_territory_id(territory.get(Svg.ID))
+                    return get_territory_id(territory.get(Svg.ID))
 
                 command = {
                     'command': 'addTerritoryConnection',
-                    'id1': get_territory_id(Inkscape.CONNECTION_START),
-                    'id2': get_territory_id(Inkscape.CONNECTION_END),
+                    'id1': local_get_territory_id(Inkscape.CONNECTION_START),
+                    'id2': local_get_territory_id(Inkscape.CONNECTION_END),
                     'wrap': connection_type_layer.get(get_uri(Inkscape.LABEL))
                 }
                 commands.append(command)
@@ -429,8 +424,8 @@ class WZMapBuilder(inkex.EffectExtension):
 
         commands = []
         for bonus_layer in bonus_layer_nodes:
-            bonus_name, bonus_value = self._get_bonus_layer_name_and_value(bonus_layer)
-            bonus_link_node = bonus_links.get(self._get_bonus_link_id(bonus_name))
+            bonus_name, bonus_value = get_bonus_layer_name_and_value(bonus_layer)
+            bonus_link_node = bonus_links.get(get_bonus_link_id(bonus_name))
             if bonus_link_node is not None:
                 node_style = bonus_link_node.composed_style()
                 bonus_color = node_style[Svg.FILL].upper()
@@ -463,8 +458,8 @@ class WZMapBuilder(inkex.EffectExtension):
         commands = [
             {
                 'command': 'addTerritoryToBonus',
-                'id': self._get_territory_id(territory),
-                'bonusName': self._get_bonus_layer_name_and_value(bonus_layer)[0]
+                'id': get_territory_id(territory),
+                'bonusName': get_bonus_layer_name_and_value(bonus_layer)[0]
             } for bonus_layer in bonus_layers
             for territory in bonus_layer.xpath(f"./{Svg.CLONE}", namespaces=NSS)
         ]
@@ -517,7 +512,7 @@ class WZMapBuilder(inkex.EffectExtension):
         commands = [
             {
                 'command': 'addTerritoryToDistribution',
-                'id': self._get_territory_id(territory),
+                'id': get_territory_id(territory),
                 'distributionName': distribution_mode_layer.get(get_uri(Inkscape.LABEL))
             } for distribution_mode_layer in distribution_mode_layers
             for territory in distribution_mode_layer.xpath(f"./{Svg.CLONE}", namespaces=NSS)
@@ -567,90 +562,6 @@ class WZMapBuilder(inkex.EffectExtension):
             parent.add(layer)
         return layer
 
-    @staticmethod
-    def _is_territory_group(group: inkex.ShapeElement) -> bool:
-        """
-        Checks if element is a territory group. It is a territory group if it is a non-layer Group
-        and has two children, one of which is a territory, the other of which is a center point
-        group.
-        :param group:
-        :return:
-        """
-        return (
-            isinstance(group, inkex.Group)
-            and not isinstance(group, inkex.Layer)
-            and len(group.getchildren()) == 2
-            and len(WZMapBuilder._get_territories(group, is_recursive=False)) == 1
-            and len(group.xpath(f"./{Svg.GROUP}[{Svg.RECTANGLE} and {Svg.TEXT}]")) == 1
-        )
-
-    @staticmethod
-    def _is_territory(element: inkex.BaseElement) -> bool:
-        """
-        Checks if the given element is a territory
-        :param element:
-        :return:
-        """
-        return Warzone.TERRITORY_IDENTIFIER in element.get_id()
-
-    @staticmethod
-    def _get_territories(
-            root: inkex.BaseElement, is_recursive: bool = True
-    ) -> List[inkex.PathElement]:
-        """
-        Gets all territory elements that are children of the root node. If not is_recursive, gets
-        only direct children.
-        :param root:
-        :param is_recursive:
-        :return:
-        """
-        slash = '//' if is_recursive else '/'
-        return root.xpath(
-            f".{slash}{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}')]",
-            namespaces=NSS
-        )
-
-    @staticmethod
-    def _get_territory_id(territory: Union[str,  inkex.PathElement, inkex.Use, inkex.Group]) -> int:
-        """
-        Returns the id of the territory. If the argument is a string it must be of the form
-        'Territory_X'. If the argument is a territory, it gets the int part of the element's id. If
-        it is a clone, it gets the int part of the id of the linked element.
-        :param territory:
-        :return:
-        territory id as required by the Warzone API
-        """
-        if isinstance(territory, str):
-            territory_id = territory.split(Warzone.TERRITORY_IDENTIFIER)[-1]
-        elif isinstance(territory, inkex.PathElement):
-            territory_id = WZMapBuilder._get_territory_id(territory.get(Svg.ID))
-        elif isinstance(territory, inkex.Group) and WZMapBuilder._is_territory_group(territory):
-            territory_id = WZMapBuilder._get_territory_id(
-                WZMapBuilder._get_territories(territory, is_recursive=False)[0]
-            )
-        elif isinstance(territory, inkex.Use):
-            territory_id = WZMapBuilder._get_territory_id(territory.get(get_uri(XLink.HREF)))
-        else:
-            raise ValueError(f'Element {territory} is not a valid territory element. It must be a'
-                             f' territory path, a territory group or a territory clone.')
-        return int(territory_id)
-
-    @staticmethod
-    def _get_territory_name(territory: inkex.PathElement) -> str:
-        """
-        Get the name of the territory from its child title element. If no title, returns
-        Warzone.UNNAMED_TERRITORY_NAME
-        :param territory:
-        :return:
-        territory name
-        """
-        title = territory.find(Svg.TITLE, NSS)
-        if title is not None:
-            territory_name = title.text
-        else:
-            territory_name = Warzone.UNNAMED_TERRITORY_NAME
-        return territory_name
-
     def get_max_territory_id(self, territories: List[inkex.PathElement] = None) -> int:
         """
         Gets the maximum territory id as an int in the territories. If territories is None, searches
@@ -658,8 +569,8 @@ class WZMapBuilder(inkex.EffectExtension):
         :return:
         maximum int id
         """
-        territories = self._get_territories(self.svg) if territories is None else territories
-        max_id = max([0] + [self._get_territory_id(territory) for territory in territories])
+        territories = get_territories(self.svg) if territories is None else territories
+        max_id = max([0] + [get_territory_id(territory) for territory in territories])
         return max_id
 
     def _get_metadata_type_layers(
@@ -681,27 +592,16 @@ class WZMapBuilder(inkex.EffectExtension):
         )
         return bonus_layers
 
-    @staticmethod
-    def _get_bonus_layer_name_and_value(bonus_layer: inkex.Layer) -> Tuple[str, int]:
-        """
-        Parses a bonus layer's label to get the bonus name and value.
-        :param bonus_layer:
-        :return:
-        tuple of bonus name and bonus value
-        """
-        bonus_name, bonus_value = bonus_layer.get(get_uri(Inkscape.LABEL)).split(': ')
-        return bonus_name, int(bonus_value)
-
     def _get_bonus_link_from_selection(self):
         """
         Gets all bonus link paths from selection
         :return:
         """
         selected_bonus_links = [
+            # todo refactor create find bonus link function
             self.find(
                 f"./{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.BONUS_LINK_IDENTIFIER}')]", group
-            ) for group in self.svg.selection.filter(inkex.Group)
-            if self._is_bonus_link_group(group)
+            ) for group in self.svg.selection.filter(inkex.Group) if is_bonus_link_group(group)
         ] + [
             path for path in self.svg.selection.filter(inkex.PathElement)
             if Warzone.BONUS_LINK_IDENTIFIER in path.get_id()
@@ -713,34 +613,6 @@ class WZMapBuilder(inkex.EffectExtension):
         else:
             raise AbortExtension("Multiple bonus links have been selected.")
         return bonus_link
-
-    @staticmethod
-    def _get_bonus_link_id(bonus_name: str) -> str:
-        """
-        Converts a bonus name to the corresponding ID for its bonus link
-        :param bonus_name:
-        :return:
-        bonus link id
-        """
-        return Warzone.BONUS_LINK_IDENTIFIER + re.sub(r'[^a-zA-Z0-9]+', '', bonus_name)
-
-    @staticmethod
-    def _is_bonus_link_group(group: inkex.ShapeElement) -> bool:
-        """
-        Checks if element is a bonus link group. It is a bonus link group if it is a non-layer Group
-        and has two children, one of which is a bonus link, the other of which is a text element.
-        :param group:
-        :return:
-        """
-        return (
-            isinstance(group, inkex.Group)
-            and not isinstance(group, inkex.Layer)
-            and len(group.getchildren()) == 2
-            and (len(group.xpath(
-                    f"./{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.BONUS_LINK_IDENTIFIER}')]", NSS
-                )) == 1)
-            and (group.find(f"./{Svg.TEXT}", NSS) is not None)
-        )
 
     ####################
     # METADATA SETTERS #
@@ -758,79 +630,6 @@ class WZMapBuilder(inkex.EffectExtension):
 
         self._get_metadata_layer(MapLayers.BONUS_LINKS, create=True)
 
-    def create_territory(
-            self, territory: inkex.PathElement, max_id: int, territory_layer: inkex.Layer = None
-    ) -> inkex.Group:
-        """
-        Converts territory path into a Warzone Territory.
-
-        Sets the id of territory to the next Warzone Territory ID after the current maximum and
-        creates a territory group containing a center-point and display army numbers. If
-        territory_layer argument is passed, move territory group to the Territories layer.
-
-        :param max_id:
-        :param territory:
-        :param territory_layer:
-        :return maximum territory id as int
-        """
-        if Warzone.TERRITORY_IDENTIFIER not in territory.get_id():
-            max_id += 1
-            territory.set_id(f"{Warzone.TERRITORY_IDENTIFIER}{max_id}")
-        parent: inkex.Group = territory.getparent()
-        if not self._is_territory_group(parent):
-            territory_group = inkex.Group.new(
-                territory.get_id(),
-                territory,
-                self._create_center_point_group(territory),
-            )
-        else:
-            territory_group = parent
-            parent = territory_group.getparent()
-        territory_style = territory.effective_style()
-        territory_style[Svg.STROKE_WIDTH] = 1
-        if territory_style.get_color() != Color.TERRITORY_FILL:
-            territory_style.set_color(Color.TERRITORY_FILL)
-        destination = territory_layer if territory_layer is not None else parent
-        if territory_group not in destination:
-            destination.add(territory_group)
-        return territory_group
-
-    @staticmethod
-    def _create_center_point_group(territory: Union[inkex.Group, inkex.PathElement]) -> inkex.Group:
-        """
-        Creates a group containing a rounded rectangle and sample army numbers centered at the
-        territory's center-point
-        :param territory:
-        :return:
-        center point group
-        """
-        # todo use https://blog.mapbox.com/a-new-algorithm-for-finding-a-visual-center-of-a-polygon-7c77e6492fbc
-        #  to set a default center point
-        center = territory.bounding_box().center
-        return inkex.Group.new(
-            territory.get_id(),
-            inkex.Rectangle.new(
-                left=center.x - Warzone.RECT_WIDTH / 2,
-                top=center.y - Warzone.RECT_HEIGHT / 2,
-                width=Warzone.RECT_WIDTH,
-                height=Warzone.RECT_HEIGHT,
-                ry=Warzone.RECT_ROUNDING,
-                rx=Warzone.RECT_ROUNDING,
-                style=inkex.Style(
-                    fill='none',
-                    stroke=Color.TERRITORY_FILL,
-                    stroke_width=1.0,
-                    stroke_linecap='round',
-                    stroke_linejoin='round',
-                ),
-            ),
-            inkex.TextElement.new(
-                WZMapBuilder.create_tspan('88', font_color=Color.BLACK),
-                x=center.x,
-                y=center.y + Warzone.ARMY_FONT_SIZE * 3/8,
-            ),
-        )
-
     def _set_bonus_link(self, bonus_link_path: inkex.PathElement) -> inkex.Group:
         """
         Creates a bonus link if it doesn't exist and adds it to the bonus link layer. Updates any
@@ -840,7 +639,7 @@ class WZMapBuilder(inkex.EffectExtension):
         bonus link
         """
         # Get bonus link path if it exists
-        bonus_link_id = self._get_bonus_link_id(self.options.bonus_name)
+        bonus_link_id = get_bonus_link_id(self.options.bonus_name)
         bonus_link_path = (
             bonus_link_path if bonus_link_path is not None
             else self.find(f".//{Svg.PATH}[{Svg.ID}='{bonus_link_id}']")
@@ -873,7 +672,7 @@ class WZMapBuilder(inkex.EffectExtension):
 
         # Get bonus link group
         parent = bonus_link_path.getparent()
-        if self._is_bonus_link_group(parent):
+        if is_bonus_link_group(parent):
             bonus_link = parent
         else:
             # Create bonus link group if it doesn't exist
@@ -882,7 +681,7 @@ class WZMapBuilder(inkex.EffectExtension):
                 bonus_link_id,
                 bonus_link_path,
                 inkex.TextElement.new(
-                    self.create_tspan(self.options.bonus_value, font_color=Color.WHITE),
+                    create_tspan(self.options.bonus_value, font_color=Color.WHITE),
                     x=location.x,
                     y=location.y + Warzone.ARMY_FONT_SIZE * 3 / 8,
                 ),
@@ -922,8 +721,8 @@ class WZMapBuilder(inkex.EffectExtension):
             def find_bonus_layers_with_name(bonus_name: str) -> List[inkex.Layer]:
                 return [
                     layer for layer in bonus_layers
-                    if bonus_name == self._get_bonus_link_id(
-                        self._get_bonus_layer_name_and_value(layer)[0]
+                    if bonus_name == get_bonus_link_id(
+                        get_bonus_layer_name_and_value(layer)[0]
                     ).split(Warzone.BONUS_LINK_IDENTIFIER)[-1]
                 ]
 
@@ -938,10 +737,10 @@ class WZMapBuilder(inkex.EffectExtension):
             bonus_link_id = bonus_link.get_id().split(Warzone.BONUS_LINK_IDENTIFIER)[-1]
             matching_bonus_layers = find_bonus_layers_with_name(bonus_link_id)
             if len(matching_bonus_layers) == 1:
-                old_bonus_name = self._get_bonus_layer_name_and_value(matching_bonus_layers[0])[0]
+                old_bonus_name = get_bonus_layer_name_and_value(matching_bonus_layers[0])[0]
             elif len(matching_bonus_layers) > 1:
                 matching_layer_names = [
-                    self._get_bonus_layer_name_and_value(layer) for layer in matching_bonus_layers
+                    get_bonus_layer_name_and_value(layer) for layer in matching_bonus_layers
                 ]
                 raise AbortExtension(
                     f"Multiple bonus layers exist matching bonus link {bonus_link_id}: "
@@ -971,7 +770,7 @@ class WZMapBuilder(inkex.EffectExtension):
             try:
                 bonus_value = int(
                     self.options.bonus_value if self.options.bonus_value != ''
-                    else self._get_bonus_layer_name_and_value(bonus_layer)[1]
+                    else get_bonus_layer_name_and_value(bonus_layer)[1]
                 )
                 self.options.bonus_value = str(bonus_value)
             except ValueError:
@@ -991,9 +790,7 @@ class WZMapBuilder(inkex.EffectExtension):
         bonus_link_layer = self._get_metadata_layer(MapLayers.BONUS_LINKS)
         for bonus_layer in self._get_metadata_type_layers(MapLayers.BONUSES):
             # get associated bonus link
-            bonus_link_id = self._get_bonus_link_id(
-                self._get_bonus_layer_name_and_value(bonus_layer)[0]
-            )
+            bonus_link_id = get_bonus_link_id(get_bonus_layer_name_and_value(bonus_layer)[0])
             bonus_link: inkex.PathElement = self.find(
                 f"./{Svg.GROUP}/{Svg.PATH}[@{Svg.ID}='{bonus_link_id}']", bonus_link_layer
             )
@@ -1008,22 +805,216 @@ class WZMapBuilder(inkex.EffectExtension):
 
                 processed_territory_ids.add(clone.get(XLink.HREF))
                 linked_element = clone.href
-                if self._is_territory_group(linked_element):
+                if is_territory_group(linked_element):
                     territory = self.find(f"./{Svg.PATH}", linked_element)
                     territory.effective_style().set_color(stroke_color, name=Svg.STROKE)
 
-    @staticmethod
-    def create_tspan(bonus_value, font_color: str):
-        return inkex.Tspan.new(
-            bonus_value,
-            style=inkex.Style(
-                fill=font_color,
-                font_weight='bold',
-                font_size=f'{Warzone.ARMY_FONT_SIZE}px',
-                text_align='center',
-                text_anchor='middle',
-            )
+
+def is_territory_group(group: inkex.ShapeElement) -> bool:
+    """
+    Checks if element is a territory group. It is a territory group if it is a non-layer Group
+    and has two children, one of which is a territory, the other of which is a center point
+    group.
+    :param group:
+    :return:
+    """
+    return (
+        isinstance(group, inkex.Group)
+        # todo also may include a title element
+        and not isinstance(group, inkex.Layer)
+        and len(group.getchildren()) == 2
+        and len(get_territories(group, is_recursive=False)) == 1
+        and len(group.xpath(f"./{Svg.GROUP}[{Svg.RECTANGLE} and {Svg.TEXT}]")) == 1
+    )
+
+
+def is_territory(element: inkex.BaseElement) -> bool:
+    """
+    Checks if the given element is a territory
+    :param element:
+    :return:
+    """
+    return Warzone.TERRITORY_IDENTIFIER in element.get_id()
+
+
+def get_territories(
+        root: inkex.BaseElement, is_recursive: bool = True
+) -> List[inkex.PathElement]:
+    """
+    Gets all territory elements that are children of the root node. If not is_recursive, gets
+    only direct children.
+    :param root:
+    :param is_recursive:
+    :return:
+    """
+    slash = '//' if is_recursive else '/'
+    return root.xpath(
+        f".{slash}{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}')]",
+        namespaces=NSS
+    )
+
+
+def get_territory_id(territory: Union[str,  inkex.PathElement, inkex.Use, inkex.Group]) -> int:
+    """
+    Returns the id of the territory. If the argument is a string it must be of the form
+    'Territory_X'. If the argument is a territory, it gets the int part of the element's id. If
+    it is a clone, it gets the int part of the id of the linked element.
+    :param territory:
+    :return:
+    territory id as required by the Warzone API
+    """
+    if isinstance(territory, str):
+        territory_id = territory.split(Warzone.TERRITORY_IDENTIFIER)[-1]
+    elif isinstance(territory, inkex.PathElement):
+        territory_id = get_territory_id(territory.get(Svg.ID))
+    elif isinstance(territory, inkex.Group) and is_territory_group(territory):
+        territory_id = get_territory_id(get_territories(territory, is_recursive=False)[0])
+    elif isinstance(territory, inkex.Use):
+        territory_id = get_territory_id(territory.get(get_uri(XLink.HREF)))
+    else:
+        raise ValueError(f'Element {territory} is not a valid territory element. It must be a'
+                         f' territory path, a territory group or a territory clone.')
+    return int(territory_id)
+
+
+def get_territory_name(territory: inkex.PathElement) -> str:
+    """
+    Get the name of the territory from its child title element. If no title, returns
+    Warzone.UNNAMED_TERRITORY_NAME
+    :param territory:
+    :return:
+    territory name
+    """
+    title = territory.find(Svg.TITLE, NSS)
+    if title is not None:
+        territory_name = title.text
+    else:
+        territory_name = Warzone.UNNAMED_TERRITORY_NAME
+    return territory_name
+
+
+def get_bonus_layer_name_and_value(bonus_layer: inkex.Layer) -> Tuple[str, int]:
+    """
+    Parses a bonus layer's label to get the bonus name and value.
+    :param bonus_layer:
+    :return:
+    tuple of bonus name and bonus value
+    """
+    bonus_name, bonus_value = bonus_layer.get(get_uri(Inkscape.LABEL)).split(': ')
+    return bonus_name, int(bonus_value)
+
+
+def get_bonus_link_id(bonus_name: str) -> str:
+    """
+    Converts a bonus name to the corresponding ID for its bonus link
+    :param bonus_name:
+    :return:
+    bonus link id
+    """
+    return Warzone.BONUS_LINK_IDENTIFIER + re.sub(r'[^a-zA-Z0-9]+', '', bonus_name)
+
+
+def is_bonus_link_group(group: inkex.ShapeElement) -> bool:
+    """
+    Checks if element is a bonus link group. It is a bonus link group if it is a non-layer Group
+    and has two children, one of which is a bonus link, the other of which is a text element.
+    :param group:
+    :return:
+    """
+    return (
+        isinstance(group, inkex.Group)
+        and not isinstance(group, inkex.Layer)
+        and len(group.getchildren()) == 2
+        and (len(group.xpath(
+                f"./{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.BONUS_LINK_IDENTIFIER}')]", NSS
+            )) == 1)
+        and (group.find(f"./{Svg.TEXT}", NSS) is not None)
+    )
+
+
+def create_territory(
+        territory: inkex.PathElement, max_id: int, territory_layer: inkex.Layer = None
+) -> inkex.Group:
+    """
+    Converts territory path into a Warzone Territory.
+
+    Sets the id of territory to the next Warzone Territory ID after the current maximum and
+    creates a territory group containing a center-point and display army numbers. If
+    territory_layer argument is passed, move territory group to the Territories layer.
+
+    :param max_id:
+    :param territory:
+    :param territory_layer:
+    :return maximum territory id as int
+    """
+    if Warzone.TERRITORY_IDENTIFIER not in territory.get_id():
+        max_id += 1
+        territory.set_id(f"{Warzone.TERRITORY_IDENTIFIER}{max_id}")
+    parent: inkex.Group = territory.getparent()
+    if not is_territory_group(parent):
+        territory_group = inkex.Group.new(
+            territory.get_id(), territory, create_center_point_group(territory),
         )
+    else:
+        territory_group = parent
+        parent = territory_group.getparent()
+    territory_style = territory.effective_style()
+    territory_style[Svg.STROKE_WIDTH] = 1
+    if territory_style.get_color() != Color.TERRITORY_FILL:
+        territory_style.set_color(Color.TERRITORY_FILL)
+    destination = territory_layer if territory_layer is not None else parent
+    if territory_group not in destination:
+        destination.add(territory_group)
+    return territory_group
+
+
+def create_center_point_group(territory: Union[inkex.Group, inkex.PathElement]) -> inkex.Group:
+    """
+    Creates a group containing a rounded rectangle and sample army numbers centered at the
+    territory's center-point
+    :param territory:
+    :return:
+    center point group
+    """
+    # todo use https://blog.mapbox.com/a-new-algorithm-for-finding-a-visual-center-of-a-polygon-7c77e6492fbc
+    #  to set a default center point
+    center = territory.bounding_box().center
+    return inkex.Group.new(
+        territory.get_id(),
+        inkex.Rectangle.new(
+            left=center.x - Warzone.RECT_WIDTH / 2,
+            top=center.y - Warzone.RECT_HEIGHT / 2,
+            width=Warzone.RECT_WIDTH,
+            height=Warzone.RECT_HEIGHT,
+            ry=Warzone.RECT_ROUNDING,
+            rx=Warzone.RECT_ROUNDING,
+            style=inkex.Style(
+                fill='none',
+                stroke=Color.TERRITORY_FILL,
+                stroke_width=1.0,
+                stroke_linecap='round',
+                stroke_linejoin='round',
+            ),
+        ),
+        inkex.TextElement.new(
+            create_tspan('88', font_color=Color.BLACK),
+            x=center.x,
+            y=center.y + Warzone.ARMY_FONT_SIZE * 3 / 8,
+        ),
+    )
+
+
+def create_tspan(bonus_value, font_color: str):
+    return inkex.Tspan.new(
+        bonus_value,
+        style=inkex.Style(
+            fill=font_color,
+            font_weight='bold',
+            font_size=f'{Warzone.ARMY_FONT_SIZE}px',
+            text_align='center',
+            text_anchor='middle',
+        )
+    )
 
 
 WZMapBuilder().run()
