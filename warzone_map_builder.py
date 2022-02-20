@@ -155,12 +155,11 @@ class WZMapBuilder(inkex.EffectExtension):
         existing_territories = get_territories(self.svg)
         max_id = self.get_max_territory_id(existing_territories)
         territories_to_process = (
-            existing_territories if self.options.territory_process_existing else []
+            set(existing_territories) if self.options.territory_process_existing else set()
         )
-
-        territories_to_process.extend([
+        territories_to_process.union({
             selected for selected in self.svg.selection.filter(inkex.PathElement)
-        ])
+        })
         for territory in territories_to_process:
             territory_group = create_territory(territory, max_id, territory_layer)
             max_id = max(max_id, get_territory_id(territory_group))
@@ -818,14 +817,13 @@ def is_territory_group(group: inkex.ShapeElement) -> bool:
     :param group:
     :return:
     """
-    return (
-        isinstance(group, inkex.Group)
-        # todo also may include a title element
-        and not isinstance(group, inkex.Layer)
-        and len(group.getchildren()) == 2
-        and len(get_territories(group, is_recursive=False)) == 1
-        and len(group.xpath(f"./{Svg.GROUP}[{Svg.RECTANGLE} and {Svg.TEXT}]")) == 1
-    )
+    validating = isinstance(group, inkex.Group)
+    validating &= not isinstance(group, inkex.Layer)
+    validating &= (size := len(group.getchildren())) <= 3
+    validating &= len(get_territories(group, is_recursive=False)) == 1
+    validating &= len(group.xpath(f"./{Svg.GROUP}[{Svg.RECTANGLE} and {Svg.TEXT}]")) == 1
+    validating &= (size == 2) or len(group.xpath(f"./{Svg.TITLE}")) == 1
+    return validating
 
 
 def is_territory(element: inkex.BaseElement) -> bool:
