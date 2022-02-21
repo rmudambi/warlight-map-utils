@@ -221,40 +221,22 @@ class WZMapBuilder(inkex.EffectExtension):
         name is changed and target layer already exists. Creates a bonus-link if necessary.
         :return:
         """
+        self._validate_bonus_specification(is_create=is_create)
+
         bonus_name = self.options.bonus_name
         bonus_value = self.options.bonus_value
+        bonus_color = self.options.bonus_color
         selected_bonus_link = self._get_bonus_link_from_selection()
-        rename_bonus = (
-            bonus_name and selected_bonus_link is not None
-            and get_bonus_link_id(bonus_name) != selected_bonus_link.get_id()
-        )
-
-        if is_create and not bonus_name:
-            raise AbortExtension("Must provide a bonus name when creating a new bonus.")
-
-        if is_create and rename_bonus:
-            raise AbortExtension(
-                f"Bonus name ({bonus_name}) is not consistent with the selected bonus link"
-                f" ({selected_bonus_link.get_id()})."
-            )
-
-        if not bonus_name and selected_bonus_link is None:
-            raise AbortExtension(
-                "Either a bonus name must be provided or a bonus link must be selected."
-            )
 
         if selected_bonus_link is None:
             bonus_link = self._get_bonus_link_from_name(bonus_name)
         else:
             bonus_link = selected_bonus_link
 
-        if rename_bonus:
-            if existing_layers := self._get_bonus_layers_with_name(bonus_name):
-                raise AbortExtension(
-                    f"Cannot create bonus {bonus_name} as bonus layers for this name already exist:"
-                    f" {[layer.get(Inkscape.LABEL) for layer in existing_layers]}"
-                )
-
+        rename_bonus = (
+            bonus_name and selected_bonus_link is not None
+            and get_bonus_link_id(bonus_name) != selected_bonus_link.get_id()
+        )
         if not bonus_name or rename_bonus:
             old_bonus_name = bonus_link.get_id().split(Warzone.BONUS_LINK_IDENTIFIER)[-1]
         else:
@@ -262,27 +244,16 @@ class WZMapBuilder(inkex.EffectExtension):
 
         # todo verify that input color is a valid color
         bonus_color = (
-            self.options.bonus_color if self.options.bonus_color
+            bonus_color if bonus_color
             else bonus_link.effective_style().get_color() if bonus_link is not None
             else Color.DEFAULT_BONUS_COLOR
         )
 
-        try:
-            if bonus_value != '':
-                int(bonus_value)
-        except ValueError:
-            raise AbortExtension(
-                f"If a bonus value is provided it must be an integer. Provided {bonus_value}"
-            )
-
         if is_create:
-            if bonus_value == '':
-                raise AbortExtension(f"Must provide a bonus value when creating a new bonus.")
             bonus_layer = inkex.Layer.new(f'{bonus_name}: {bonus_value}')
             bonus_layer.add(inkex.Title.new(bonus_color))
             self._get_metadata_layer(MapLayers.BONUSES).add(bonus_layer)
         else:
-            debug(f'obn: {old_bonus_name}')
             bonus_layers = self._get_bonus_layers_with_name(old_bonus_name)
             if not bonus_layers:
                 raise AbortExtension("Cannot update non-existent bonus.")
@@ -294,7 +265,7 @@ class WZMapBuilder(inkex.EffectExtension):
 
             bonus_layer = bonus_layers[0]
             old_name, old_value = get_bonus_layer_name_and_value(bonus_layer)
-            bonus_name = bonus_name if rename_bonus else old_name
+            bonus_name = bonus_name if bonus_name else old_name
             bonus_value = bonus_value if bonus_value else old_value
             bonus_layer.set(Inkscape.LABEL, f'{bonus_name}: {bonus_value}')
             self.find(Svg.TITLE, bonus_layer).text = bonus_color
@@ -665,6 +636,63 @@ class WZMapBuilder(inkex.EffectExtension):
         ]
         return commands
 
+    ####################
+    # VALIDATION UTILS #
+    ####################
+
+    def _validate_bonus_specification(self, is_create: bool) -> None:
+        """
+        Raises an informative exception if the bonus input doesn't validate
+        :return:
+        """
+        bonus_name = self.options.bonus_name
+        bonus_value = self.options.bonus_value
+        bonus_color = self.options.bonus_color
+        selected_bonus_link = self._get_bonus_link_from_selection()
+        rename_bonus = (
+            bonus_name and selected_bonus_link is not None
+            and get_bonus_link_id(bonus_name) != selected_bonus_link.get_id()
+        )
+
+        if is_create and not bonus_name:
+            raise AbortExtension("Must provide a bonus name when creating a new bonus.")
+
+        if is_create and rename_bonus:
+            raise AbortExtension(
+                f"Bonus name '{bonus_name}' is not consistent with the selected bonus link"
+                f" '{selected_bonus_link.get_id()}'."
+            )
+
+        if not bonus_name and selected_bonus_link is None:
+            raise AbortExtension(
+                "Either a bonus name must be provided or a bonus link must be selected."
+            )
+
+        if existing_layers := self._get_bonus_layers_with_name(bonus_name):
+            raise AbortExtension(
+                f"Cannot create bonus '{bonus_name}' as bonus layers for this name already exist:"
+                f" {[layer.get(Inkscape.LABEL) for layer in existing_layers]}."
+            )
+
+        if bonus_value != '':
+            try:
+                int(bonus_value)
+            except ValueError:
+                raise AbortExtension(
+                    f"If a bonus value is provided it must be an integer. Provided '{bonus_value}'."
+                )
+        elif is_create:
+            raise AbortExtension(f"Must provide a bonus value when creating a new bonus.")
+
+        if bonus_color:
+            try:
+                inkex.Color(bonus_color)
+            except inkex.colors.ColorError:
+                raise AbortExtension(
+                    f"If a bonus color is provided if must be an RGB string in the form '#00EE33'."
+                    f" Provided {bonus_color}"
+                )
+
     #################
     # PARSING UTILS #
     #################
@@ -752,7 +780,6 @@ class WZMapBuilder(inkex.EffectExtension):
         exception if there is more than one.
         :return:
         """
-        debug(f's: {self.svg.selection}')
         selected_bonus_links = [
             self.find(f"./{Svg.PATH}", group)
             for group in self.svg.selection.filter(inkex.Group) if is_bonus_link_group(group)
@@ -770,12 +797,10 @@ class WZMapBuilder(inkex.EffectExtension):
         return bonus_link
 
     def _get_bonus_layers_with_name(self, bonus_name: str) -> List[inkex.Layer]:
+        bonus_link_id = get_bonus_link_id(bonus_name)
         return [
             layer for layer in self._get_metadata_type_layers(MapLayers.BONUSES)
-            if (
-                get_bonus_link_id(bonus_name)
-                == get_bonus_link_id(get_bonus_layer_name_and_value(layer)[0])
-            )
+            if bonus_link_id == get_bonus_link_id(get_bonus_layer_name_and_value(layer)[0])
         ]
 
     ####################
@@ -829,14 +854,7 @@ class WZMapBuilder(inkex.EffectExtension):
         # Set bonus link fill and stroke
         bonus_link_style = bonus_link_path.effective_style()
         bonus_link_style.set_color(Color.BONUS_LINK_STROKE, name=Svg.STROKE)
-        if bonus_color:
-            try:
-                bonus_link_style.set_color(bonus_color)
-            except inkex.colors.ColorError:
-                raise AbortExtension(
-                    f"If a bonus color is provided if must be an RGB string in the form '#00EE33'."
-                    f" Provided {bonus_color}"
-                )
+        bonus_link_style.set_color(bonus_color)
 
         # Get bonus link group
         parent = bonus_link_path.getparent()
@@ -1005,13 +1023,13 @@ def is_territory_group(group: inkex.ShapeElement) -> bool:
     :param group:
     :return:
     """
-    validating = isinstance(group, inkex.Group)
-    validating &= not isinstance(group, inkex.Layer)
-    validating &= (size := len(group.getchildren())) <= 3
-    validating &= len(get_territories(group, is_recursive=False)) == 1
-    validating &= len(group.xpath(f"./{Svg.GROUP}[{Svg.RECTANGLE} and {Svg.TEXT}]")) == 1
-    validating &= (size == 2) or len(group.xpath(f"./{Svg.TITLE}")) == 1
-    return validating
+    valid = isinstance(group, inkex.Group)
+    valid = valid and not isinstance(group, inkex.Layer)
+    valid = valid and len(group.getchildren()) in [2, 3]
+    valid = valid and len(get_territories(group, is_recursive=False)) == 1
+    valid = valid and len(group.xpath(f"./{Svg.GROUP}[{Svg.RECTANGLE} and {Svg.TEXT}]")) == 1
+    valid = valid and (len(group.getchildren() == 2) or len(group.xpath(f"./{Svg.TITLE}")) == 1)
+    return valid
 
 
 def is_territory(element: inkex.BaseElement) -> bool:
@@ -1107,23 +1125,14 @@ def is_bonus_link_group(group: inkex.ShapeElement) -> bool:
     :param group:
     :return:
     """
-    debug(f'blgc: {[c.get_id() for c in group.getchildren()]}')
-    validating = isinstance(group, inkex.Group)
-    i = 0
-    debug(f'v{i}: {validating}')
-    validating &= not isinstance(group, inkex.Layer)
-    i += 1
-    debug(f'v{i}: {validating}')
-    validating &= len(group.getchildren()) == 2
-    i += 1
-    debug(f'v{i}: {validating}')
-    validating &= find(f"./{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.BONUS_LINK_IDENTIFIER}')]", group) is not None
-    i += 1
-    debug(f'v{i}: {validating}')
-    validating &= find(f"./{Svg.TEXT}", group) is not None
-    i += 1
-    debug(f'v{i}: {validating}')
-    return validating
+    valid = isinstance(group, inkex.Group)
+    valid = valid and not isinstance(group, inkex.Layer)
+    valid = valid and len(group.getchildren()) == 2
+    valid = valid and find(
+        f"./{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.BONUS_LINK_IDENTIFIER}')]", group
+    ) is not None
+    valid = valid and find(f"./{Svg.TEXT}", group) is not None
+    return valid
 
 
 def create_territory(
