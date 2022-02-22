@@ -39,7 +39,7 @@
                 true
             </param>
         </page>
-        <page name="connection" gui-text="Connections">
+        <page name="connections" gui-text="Connections">
             <label appearance="header">Toggle Connection</label>
             <label>
                 Creates a connection between two selected territories if they are currently not

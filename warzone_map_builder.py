@@ -91,6 +91,13 @@ class Warzone:
 
 
 class WZMapBuilder(inkex.EffectExtension):
+
+    TAB_OPTIONS = ['about', 'territories', 'bonuses', 'connections', 'upload']
+    TERRITORY_TAB_OPTIONS = ['create', 'name']
+    BONUS_TAB_OPTIONS = ['create-update', 'bonus-territories']
+    BONUS_CREATE_UPDATE_TAB_OPTIONS = ['create', 'update']
+    BONUS_TERRITORY_TAB_OPTIONS = ['add', 'replace']
+
     def add_arguments(self, ap: ArgumentParser) -> None:
         ap.add_argument("--tab", type=str, default='about')
 
@@ -125,6 +132,7 @@ class WZMapBuilder(inkex.EffectExtension):
         ap.add_argument("--upload_territory_distribution_modes", type=inkex.Boolean, default=False)
 
     def effect(self) -> None:
+        self._clean_up_tab_inputs()
         self._setup_map_layers()
         return {
             'about': None,
@@ -142,7 +150,7 @@ class WZMapBuilder(inkex.EffectExtension):
                     'replace': self._replace_territories_in_bonus,
                 }[self.options.bonus_territories_tab],
             }[self.options.bonus_tab],
-            'connection': self._set_connection,
+            'connections': self._set_connection,
             'upload': self._upload_metadata,
         }[self.options.tab]()
 
@@ -164,7 +172,7 @@ class WZMapBuilder(inkex.EffectExtension):
             if self.options.territory_layer else None
         )
         existing_territories = get_territories(self.svg)
-        max_id = self.get_max_territory_id(existing_territories)
+        max_id = self._get_max_territory_id(existing_territories)
         territories_to_process = (
             set(existing_territories) if self.options.territory_process_existing else set()
         )
@@ -200,7 +208,7 @@ class WZMapBuilder(inkex.EffectExtension):
             if self.options.territory_layer else None
         )
 
-        territory_group = create_territory(territory, self.get_max_territory_id(), territory_layer)
+        territory_group = create_territory(territory, self._get_max_territory_id(), territory_layer)
         territory_group.add(inkex.Title.new(self.options.territory_name))
 
     def _create_bonus(self) -> None:
@@ -221,7 +229,7 @@ class WZMapBuilder(inkex.EffectExtension):
         name is changed and target layer already exists. Creates a bonus-link if necessary.
         :return:
         """
-        self._clean_up_inputs(is_create=is_create, add_territories=False)
+        self._clean_up_bonus_inputs(is_create=is_create, add_territories=False)
 
         bonus_name = self.options.bonus_name
         bonus_value = self.options.bonus_value
@@ -253,14 +261,30 @@ class WZMapBuilder(inkex.EffectExtension):
         Raises an error if both are provided and don't have compatible names.
         :return:
         """
-        # todo get bonus link from selection
-        # todo if bonus link and name provided, throw error if they don't match
-        # todo get bonus layer
-        # todo for each selected territory or territory group
-        #  if path, get territory group (convert to territory if needed)
-        #  if territory group without a clone in the layer, add a clone to the layer
-        # todo update stroke colors of selected territories
-        pass
+        self._clean_up_bonus_inputs(is_create=False, add_territories=True)
+        bonus_layer = self.options.bonus_layer
+        territory_groups = self.options.territories
+
+        non_territory_elements = []
+        territory_clones = {}
+        for element in bonus_layer.getchildren():
+            if isinstance(element, inkex.Title):
+                non_territory_elements.append(element)
+            else:
+                linked_element = element.href
+                if is_bonus_link_group(linked_element):
+                    non_territory_elements.append(element)
+                elif not replace:
+                    territory_clones[linked_element.get_id()] = element
+
+        for territory_group in territory_groups:
+            if not territory_group.get_id() in territory_clones:
+                territory_clones[territory_group.get_id()] = inkex.Use.new(territory_group, 0, 0)
+
+        bonus_layer.remove_all()
+        bonus_layer.add(*[clone for clone in territory_clones.values()])
+        bonus_layer.add(*non_territory_elements)
+        self._set_territory_stroke()
 
     def _replace_territories_in_bonus(self) -> None:
         """
@@ -270,43 +294,6 @@ class WZMapBuilder(inkex.EffectExtension):
         :return:
         """
         self._add_territories_to_bonus(replace=True)
-
-    def _set_bonus(self) -> None:
-        """
-        Creates a bonus layer if it doesn't exist and adds the selected territories to it. If the
-        bonus previously existed, either adds the territories to the bonus or replaces existing
-        territories depending on bonus_replace option. Creates a bonus-link if necessary.
-        :return:
-        """
-        bonus_link = self._get_bonus_link_from_selection()
-        territories = [
-            get_territories(group)[0] for group in self.svg.selection if is_territory_group(group)
-        ]
-
-        if bonus_link is None and not territories:
-            raise AbortExtension("No bonus link or territories have been selected.")
-
-        self.svg.selection.set(*territories)
-
-        bonus_layer = self._get_or_create_bonus_layer(bonus_link)
-
-        if self.options.bonus_link_visible:
-            bonus_link = self._set_bonus_link(bonus_link)
-        else:
-            bonus_link = None
-
-        bonus_territories = [
-            inkex.Use.new(territory.getparent(), 0, 0) for territory in territories
-        ]
-        if self.options.bonus_replace:
-            bonus_layer.remove_all()
-
-        bonus_layer.add(*bonus_territories)
-        if bonus_link is not None and self.find(
-            f"./{Svg.CLONE}[@{XLink.HREF}='#{bonus_link.get_id()}']", bonus_layer
-        ) is None:
-            bonus_layer.add(inkex.Use.new(bonus_link, 0, 0))
-        self._set_territory_stroke()
 
     def _set_connection(self) -> None:
         territory_groups = [group for group in self.svg.selection if is_territory_group(group)]
@@ -601,7 +588,29 @@ class WZMapBuilder(inkex.EffectExtension):
     # VALIDATION UTILS #
     ####################
 
-    def _clean_up_inputs(self, is_create: bool = False, add_territories: bool = False) -> None:
+    def _clean_up_tab_inputs(self) -> None:
+
+        self.options.tab = self.options.tab if self.options.tab in self.TAB_OPTIONS else 'about'
+        self.options.territory_tab = (
+            self.options.territory_tab if self.options.territory_tab in self.TERRITORY_TAB_OPTIONS
+            else 'create'
+        )
+        self.options.bonus_tab = (
+            self.options.bonus_tab if self.options.bonus_tab in self.BONUS_TAB_OPTIONS
+            else 'create-update'
+        )
+        self.options.bonus_create_update_tab = (
+            self.options.bonus_create_update_tab
+            if self.options.bonus_create_update_tab in self.BONUS_CREATE_UPDATE_TAB_OPTIONS
+            else 'create'
+        )
+        self.options.bonus_territories_tab = (
+            self.options.bonus_territories_tab
+            if self.options.bonus_territories_tab in self.BONUS_TERRITORY_TAB_OPTIONS
+            else 'add'
+        )
+
+    def _clean_up_bonus_inputs(self, is_create: bool = False, add_territories: bool = False) -> None:
         """
         Gets true inputs for bonus name, bonus link, and bonus layer. Raises an informative
         exception if the bonus input doesn't validate.
@@ -627,6 +636,19 @@ class WZMapBuilder(inkex.EffectExtension):
             raise AbortExtension(
                 "Either a bonus name must be provided or a bonus link must be selected."
             )
+
+        if add_territories:
+            if selected_paths := self.svg.selection.filter(inkex.PathElement):
+                raise AbortExtension(
+                    f"Please convert all selected paths into territories before adding them to a"
+                    f" bonus: {[path.get_id() for path in selected_paths]}."
+                )
+
+            territories = [group for group in self.svg.selection if is_territory_group(group)]
+            if not territories:
+                raise AbortExtension("No territories have been selected.")
+
+            self.options.territories = territories
 
         bonus_link = (
             selected_bonus_link if selected_bonus_link is not None
@@ -726,7 +748,7 @@ class WZMapBuilder(inkex.EffectExtension):
             parent.add(layer)
         return layer
 
-    def get_max_territory_id(self, territories: List[inkex.PathElement] = None) -> int:
+    def _get_max_territory_id(self, territories: List[inkex.PathElement] = None) -> int:
         """
         Gets the maximum territory id as an int in the territories. If territories is None, searches
         the whole svg.
@@ -959,28 +981,20 @@ class WZMapBuilder(inkex.EffectExtension):
         return bonus_layer
 
     def _set_territory_stroke(self) -> None:
-        processed_territory_ids = set()
-        bonus_link_layer = self._get_metadata_layer(MapLayers.BONUS_LINKS)
+        processed_territory_ids = {None}
         for bonus_layer in self._get_metadata_type_layers(MapLayers.BONUSES):
-            # get associated bonus link
-            bonus_link_id = get_bonus_link_id(get_bonus_layer_name_and_value(bonus_layer)[0])
-            bonus_link: inkex.PathElement = self.find(
-                f"./{Svg.GROUP}/{Svg.PATH}[@{Svg.ID}='{bonus_link_id}']", bonus_link_layer
-            )
-            if bonus_link is None:
-                stroke_color = Color.DEFAULT_BONUS_COLOR
-            else:
-                stroke_color = bonus_link.effective_style().get_color()
+            bonus_color = bonus_layer.find(Svg.TITLE, NSS).text
 
             for clone in bonus_layer.getchildren():
                 if clone.get(XLink.HREF) in processed_territory_ids:
                     continue
 
-                processed_territory_ids.add(clone.get(XLink.HREF))
                 linked_element = clone.href
                 if is_territory_group(linked_element):
                     territory = self.find(f"./{Svg.PATH}", linked_element)
-                    territory.effective_style().set_color(stroke_color, name=Svg.STROKE)
+                    territory.effective_style().set_color(bonus_color, name=Svg.STROKE)
+
+                processed_territory_ids.add(clone.get(XLink.HREF))
 
 
 def find(xpath: str, root: inkex.BaseElement):
@@ -1002,6 +1016,12 @@ def find(xpath: str, root: inkex.BaseElement):
 
 
 def find_clone(element: inkex.BaseElement, root: inkex.Layer) -> inkex.Use:
+    """
+    Find a clone of the element which is a direct child of the root node.
+    :param element:
+    :param root:
+    :return:
+    """
     return find(f"./{Svg.CLONE}[@{XLink.HREF}='#{element.get_id()}']", root)
 
 
@@ -1018,7 +1038,7 @@ def is_territory_group(group: inkex.ShapeElement) -> bool:
     valid = valid and len(group.getchildren()) in [2, 3]
     valid = valid and len(get_territories(group, is_recursive=False)) == 1
     valid = valid and len(group.xpath(f"./{Svg.GROUP}[{Svg.RECTANGLE} and {Svg.TEXT}]")) == 1
-    valid = valid and (len(group.getchildren() == 2) or len(group.xpath(f"./{Svg.TITLE}")) == 1)
+    valid = valid and (len(group.getchildren()) == 2) or (len(group.xpath(f"./{Svg.TITLE}")) == 1)
     return valid
 
 
