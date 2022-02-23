@@ -56,8 +56,8 @@
             <label appearance="header">Create or Update Bonus</label>
             <param name="bonus_name" type="string" gui-text="Name"/>
             <param name="bonus_tab" type="notebook">
-                <page name="create-update" gui-text="Bonus Properties">
-                    <param name="bonus_create_update_tab" type="notebook">
+                <page name="create-update" gui-text="Create/Update">
+                    <param name="bonus_properties_tab" type="notebook">
                         <page name="create" gui-text="Create Bonus">
                             <label>
                                 Creates a bonus. Must provide a name. If a bonus link is selected
@@ -79,21 +79,27 @@
                     <param name="bonus_link_visible" type="bool"
                            gui-text="Bonus link should be visible">true</param>
                 </page>
-                <page name="bonus-territories" gui-text="Bonus Territories">
+                <page name="delete" gui-text="Delete">
+                    <label>
+                        Deletes the bonus corresponding to the provided bonus name or selected bonus
+                        link.
+                    </label>
+                </page>
+                <page name="bonus-territories" gui-text="Add/Replace Territories">
                     <param name="bonus_territories_tab" type="notebook">
                         <page name="add" gui-text="Add Territories">
                             <label appearance="header">Add Territories to Bonus</label>
                             <label>
-                                Adds selected territories to the bonus. The bonus name must be provided
-                                or a bonus link must be selected.
+                                Adds selected territories to the bonus. The bonus name must be
+                                provided or a bonus link must be selected.
                                 <br/><br/>Existing territories will remain in the bonus.
                             </label>
                         </page>
                         <page name="replace" gui-text="Replace Territories">
                         <label appearance="header">Replace Territories in Bonus</label>
                             <label>
-                                Replaces all territories in the bonus with the selected territories. The
-                                bonus name must be provided or a bonus link must be selected.
+                                Replaces all territories in the bonus with the selected territories.
+                                The bonus name must be provided or a bonus link must be selected.
                             </label>
                         </page>
                     </param>
