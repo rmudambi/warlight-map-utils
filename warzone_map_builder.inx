@@ -54,7 +54,7 @@
         </page>
         <page name="bonuses" gui-text="Bonus">
             <label appearance="header">Create or Update Bonus</label>
-            <param name="bonus_name" type="string" gui-text="Name"/>
+            <param name="bonus_name" type="string" gui-text="Bonus Name"/>
             <param name="bonus_tab" type="notebook">
                 <page name="create-update" gui-text="Create/Update">
                     <param name="bonus_properties_tab" type="notebook">
@@ -71,6 +71,7 @@
                                 bonus link is selected, updates bonus with the provided name.
                                 <br/><br/>Empty name, value, or color fields will be left unchanged.
                             </label>
+                            <param name="bonus_name_update" type="string" gui-text="Update Name"/>
                         </page>
                     </param>
                     <param name="bonus_value" type="string" gui-text="Army Value"/>
