@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 from enum import Enum
 import json
 import re
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Set, Tuple, Union
 
 import inkex
 from inkex import AbortExtension, NSS
@@ -112,7 +112,6 @@ class WZMapBuilder(inkex.EffectExtension):
 
         # arguments for territories
         ap.add_argument("--territory_tab", type=str, default='create')
-        ap.add_argument("--territory_process_existing", type=inkex.Boolean, default=True)
         ap.add_argument("--territory_name", type=str, default=Warzone.UNNAMED_TERRITORY_NAME)
         ap.add_argument("--territory_layer", type=inkex.Boolean, default=True)
 
@@ -172,9 +171,8 @@ class WZMapBuilder(inkex.EffectExtension):
     def _create_territories(self) -> None:
         """
         Converts all selected paths to a Warzone Territories by setting a Warzone Territory ID and
-        creating a territory group. If process-existing checkbox is checked, validate all existing
-        territories as well as selected paths. If territory-layer checkbox is checked, move
-        territories to the Territories layer.
+        creating a territory group. Validates all existing territories as well as selected paths. If
+        territory-layer checkbox is checked, move territories to the Territories layer.
         :return:
         """
 
@@ -182,12 +180,10 @@ class WZMapBuilder(inkex.EffectExtension):
             self._get_metadata_layer(MapLayers.TERRITORIES)
             if self.options.territory_layer else None
         )
-        existing_territories = get_territories(self.svg)
+        existing_territories = set(get_territories(self.svg))
         max_id = self._get_max_territory_id(existing_territories)
-        territories_to_process = (
-            set(existing_territories) if self.options.territory_process_existing else set()
-        )
-        territories_to_process = territories_to_process.union({
+
+        territories_to_process = existing_territories.union({
             selected for selected in self.svg.selection.filter(inkex.PathElement)
         })
         for territory in territories_to_process:
@@ -739,7 +735,7 @@ class WZMapBuilder(inkex.EffectExtension):
             parent.add(layer)
         return layer
 
-    def _get_max_territory_id(self, territories: List[inkex.PathElement] = None) -> int:
+    def _get_max_territory_id(self, territories: Set[inkex.PathElement] = None) -> int:
         """
         Gets the maximum territory id as an int in the territories. If territories is None, searches
         the whole svg.

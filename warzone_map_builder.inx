@@ -15,27 +15,25 @@
                 <page name="create" gui-text="Create Territories">
                     <label appearance="header">Converts Paths into Warzone Territories</label>
                     <label>Sets a Warzone Territory ID for all selected path elements. Additionally,
-                        adds a center-point with example army numbers. Center-points will be
-                        generated for all previously existing Warzone Territories that previously
-                        lacked them.<br/>
+                        adds a center-point with example army numbers. Ensures that all paths
+                        with manually set Warzone Territory IDs have been processed.
                     </label>
-                    <param name="territory_process_existing" type="bool"
-                           gui-text="Standardize all existing territories">
-                        true
-                    </param>
                 </page>
                 <page name="name" gui-text="Territory Name">
                     <label appearance="header">Set Territory Name</label>
                     <label>Sets the territory name of a selected territory element. If the element
                         is not currently a Warzone Territory, a Warzone Territory ID will be
-                        assigned and a center-point created.<br/>
+                        assigned and a center-point created.
                     </label>
-                    <param name="territory_name" type="string" gui-text="Territory Name">
+                    <spacer/>
+                    <param name="territory_name" type="string" gui-text="Territory Name:    ">
                         Unnamed
                     </param>
                 </page>
             </param>
-            <param name="territory_layer" type="bool" gui-text="Move to WZ:Territories layer">
+            <spacer/>
+            <param name="territory_layer" type="bool" gui-text="  Move to Territories layer"
+                   gui-description="If selected collect all territories into a single layer.">
                 true
             </param>
         </page>
@@ -46,7 +44,9 @@
                 connected and removes the connection if they are. Can create vertically or
                 horizontally wrapping connections.
             </label>
-            <param name="connection_type" type="optiongroup" appearance="combo" gui-text="Connection Type">
+            <spacer/>
+            <param name="connection_type" type="optiongroup" appearance="radio"
+                   gui-text="Connection Type:" gui-description="Specify connection type">
                 <option value="Normal">Normal</option>
                 <option value="WrapHorizontally">Wrap Horizontally</option>
                 <option value="WrapVertically">Wrap Vertically</option>
@@ -54,7 +54,8 @@
         </page>
         <page name="bonuses" gui-text="Bonus">
             <label appearance="header">Create or Update Bonus</label>
-            <param name="bonus_name" type="string" gui-text="Bonus Name"/>
+            <param name="bonus_name" type="string" gui-text="Bonus Name:    "
+                   gui-description="Name of the bonus. Can be empty if a bonus-link is selected (unless creating a bonus)."/>
             <param name="bonus_tab" type="notebook">
                 <page name="create-update" gui-text="Create/Update">
                     <param name="bonus_properties_tab" type="notebook">
@@ -67,18 +68,26 @@
                         </page>
                         <page name="update" gui-text="Update Bonus">
                             <label>
-                                Updates the bonus corresponding to the selected bonus link. If no
-                                bonus link is selected, updates bonus with the provided name.
+                                Updates the specified bonus.
                                 <br/><br/>Empty name, value, or color fields will be left unchanged.
                             </label>
-                            <param name="bonus_name_update" type="string" gui-text="Update Name"/>
+                            <param name="bonus_name_update" type="string"
+                                   gui-text="Update Name:    "
+                                   gui-description="Name to change the bonus name to. The bonus name will be unchanged if this is empty."/>
                         </page>
                     </param>
-                    <param name="bonus_value" type="string" gui-text="Army Value"/>
+                    <param name="bonus_value" type="string" gui-text="Army Value:    "
+                           gui-description="Specify bonus value. If updating bonus, this can be left blank to leave the bonus value unchanged."/>
                     <!-- todo change to use color picker -->
-                    <param name="bonus_color" type="string" gui-text="Color">#000000</param>
+                    <param name="bonus_color" type="string" gui-text="Color:    "
+                           gui-description="Specify bonus color. If updating bonus, this can be left blank to leave the bonus color unchanged.">
+                        #000000
+                    </param>
                     <param name="bonus_link_visible" type="bool"
-                           gui-text="Bonus link should be visible">true</param>
+                           gui-text="  Bonus link should be visible"
+                           gui-description="If selected, this bonus will have a visible bonus-link.">
+                        true
+                    </param>
                 </page>
                 <page name="delete" gui-text="Delete">
                     <label>
