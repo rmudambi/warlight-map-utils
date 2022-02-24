@@ -106,6 +106,8 @@ class WZMapBuilder(inkex.EffectExtension):
     BONUS_TAB_OPTIONS = ['create-update', 'bonus-territories', 'delete']
     BONUS_CREATE_UPDATE_TAB_OPTIONS = ['create', 'update']
     BONUS_TERRITORY_TAB_OPTIONS = ['add', 'replace']
+    DISTRIBUTION_TAB_OPTIONS = ['crud', 'distribution-territories']
+    DISTRIBUTION_CRUD_TAB_OPTIONS = ['create', 'update', 'delete']
 
     def add_arguments(self, ap: ArgumentParser) -> None:
         ap.add_argument("--tab", type=str, default='about')
@@ -115,7 +117,7 @@ class WZMapBuilder(inkex.EffectExtension):
         ap.add_argument("--territory_name", type=str, default=Warzone.UNNAMED_TERRITORY_NAME)
         ap.add_argument("--territory_layer", type=inkex.Boolean, default=True)
 
-        # arguments for set bonus
+        # arguments for bonuses
         ap.add_argument("--bonus_name", type=str, default='')
         ap.add_argument("--bonus_tab", type=str, default='create-update')
         ap.add_argument("--bonus_properties_tab", type=str, default='create')
@@ -125,8 +127,17 @@ class WZMapBuilder(inkex.EffectExtension):
         ap.add_argument("--bonus_link_visible", type=inkex.Boolean, default=True)
         ap.add_argument("--bonus_territories_add_replace", type=str, default='add')
 
-        # arguments for set connections
-        ap.add_argument("--connection_type", default='normal')
+        # arguments for connections
+        ap.add_argument("--connection_type", type=str, default='normal')
+
+        # arguments for distribution modes
+        ap.add_argument("--distribution_name", type=str, default='')
+        ap.add_argument("--distribution_tab", type=str, default='crud')
+        ap.add_argument("--distribution_crud_tab", type=str, default='create')
+        ap.add_argument("--distribution_name_update", type=str, default='')
+        ap.add_argument("--distribution_scenario_names", type=str, default='')
+        ap.add_argument("--distribution_territories_add_replace", type=str, default='add')
+        ap.add_argument("--distribution_territory_scenario_name", type=str, default='')
 
         # arguments for metadata upload
         ap.add_argument("--upload_email", type=str, default='')
@@ -155,6 +166,10 @@ class WZMapBuilder(inkex.EffectExtension):
                 'delete': self._delete_bonus,
             }[self.options.bonus_tab],
             'connections': self._set_connection,
+            'distributions': {
+                'crud': self._set_distribution_mode,
+                'distribution-territories': self._add_territories_to_distribution_mode
+            }[self.options.distribution_tab],
             'upload': self._upload_metadata,
         }[self.options.tab]()
 
@@ -319,6 +334,22 @@ class WZMapBuilder(inkex.EffectExtension):
             parent=self._get_metadata_layer(MapLayers.CONNECTIONS)
         )
         connection_type_layer.add(connector)
+
+    def _set_distribution_mode(self) -> None:
+        """
+
+        :return:
+        """
+        # todo
+        pass
+
+    def _add_territories_to_distribution_mode(self) -> None:
+        """
+
+        :return:
+        """
+        # todo
+        pass
 
     def _upload_metadata(self) -> None:
         commands = self._get_set_metadata_commands()
@@ -596,6 +627,16 @@ class WZMapBuilder(inkex.EffectExtension):
         self.options.bonus_properties_tab = (
             self.options.bonus_properties_tab
             if self.options.bonus_properties_tab in self.BONUS_CREATE_UPDATE_TAB_OPTIONS
+            else 'create'
+        )
+        self.options.distribution_tab = (
+            self.options.distribution_tab
+            if self.options.distribution_tab in self.DISTRIBUTION_TAB_OPTIONS
+            else 'crud'
+        )
+        self.options.distribution_crud_tab = (
+            self.options.distribution_crud_tab
+            if self.options.distribution_crud_tab in self.DISTRIBUTION_CRUD_TAB_OPTIONS
             else 'create'
         )
 

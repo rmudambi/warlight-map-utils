@@ -149,9 +149,9 @@
                     <label appearance="header">Add or replace selected territories<br/></label>
                     <param name="distribution_territories_add_replace" type="optiongroup"
                            appearance="radio" gui-text="Add or Replace Territory:"
-                           gui-description="Add or remove territories for this distribution mode.">
-                       <option value="add">Add territories</option>
-                       <option value="replace">Replace territories</option>
+                           gui-description="Add or replace territories for this distribution mode.">
+                       <option value="add">  Add territories</option>
+                       <option value="replace">  Replace territories</option>
                     </param>
                     <param name="distribution_territory_scenario_name" type="string"
                            gui-text="Scenario Name:    "
