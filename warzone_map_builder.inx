@@ -107,6 +107,58 @@
                 </page>
             </param>
         </page>
+        <page name="distributions" gui-text="Distribution Mode">
+            <label appearance="header">Create or Update Distribution Mode</label>
+            <param name="distribution_name" type="string" gui-text="Distribution Mode Name:    "
+                   gui-description="Specify name of distribution to create, update, or delete"/>
+            <param name="distribution_tab" type="notebook">
+                <page name="crud" gui-text="Create/Update/Delete">
+                    <param name="distribution_crud_tab" type="notebook">
+                        <page name="create" gui-text="Create">
+                            <label>
+                                Creates a distribution mode with the given name.
+                                <br/><br/>Will create a scenario distribution if scenarios are
+                                specified. Scenario names should each be on a new line.
+                            </label>
+                        </page>
+                        <page name="update" gui-text="Update">
+                            <label>
+                                Updates the distribution mode with the given name. Can rename the
+                                distribution mode or add new scenarios.
+                                <br/><br/>If converting a non-scenario distribution to a scenario
+                                distribution, all territories will be removed from the distribution
+                                mode.
+                            </label>
+                            <param name="distribution_name_update" type="string"
+                                   gui-text="Update Name:    "/>
+                        </page>
+                        <page name="delete" gui-text="Delete">
+                            <label>
+                                Delete the distribution mode with the given name. If scenario names
+                                are provided, will delete the specified scenarios.
+                                <br/><br/>If the last scenario is deleted from a scenario
+                                distribution, will convert to a non-scenario distribution.
+                            </label>
+                        </page>
+                    </param>
+                    <param name="distribution_scenario_names" type="string"
+                           appearance="multiline" gui-text="Scenario Names:    "
+                           gui-description="Leave empty for a normal distribution mode. For a scenario distribution, specify each scenario name on a separate line. There must be at least two scenarios."/>
+                </page>
+                <page name="distribution-territories" gui-text="Add/Replace Territories">
+                    <label appearance="header">Add or replace selected territories<br/></label>
+                    <param name="distribution_territories_add_replace" type="optiongroup"
+                           appearance="radio" gui-text="Add or Replace Territory:"
+                           gui-description="Add or remove territories for this distribution mode.">
+                       <option value="add">Add territories</option>
+                       <option value="replace">Replace territories</option>
+                    </param>
+                    <param name="distribution_territory_scenario_name" type="string"
+                           gui-text="Scenario Name:    "
+                           gui-description="For scenario distributions, specify scenario to add territories to."/>
+                </page>
+            </param>
+        </page>
         <page name="upload" gui-text="Upload Metadata">
             <label appearance="header">Load Map Metadata to Warzone</label>
             <param name="upload_email" type="string" gui-text="Warzone Email Address"/>

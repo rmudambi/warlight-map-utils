@@ -17,7 +17,13 @@ Find bonus-less territories
 Find connection-less territories
     find all territories with no connections
 
+Add gui-description to all tabs
+Add colons after each parameter name
 Add option not to set territory stroke colors if that is slow
+Add ability to display only selected bonus/dist-mode (hide all other layers)
+Add ability to show/hide connections
+Add ability to show/hide territory numbers
+Add ability to choose connection color
 
 Create INSS bonus layers from the extension
     input key-value pairs for # of territories and income
