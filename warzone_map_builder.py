@@ -123,7 +123,7 @@ class WZMapBuilder(inkex.EffectExtension):
         ap.add_argument("--bonus_value", type=str, default='')
         ap.add_argument("--bonus_color", type=str, default='')
         ap.add_argument("--bonus_link_visible", type=inkex.Boolean, default=True)
-        ap.add_argument("--bonus_territories_tab", type=str, default='add')
+        ap.add_argument("--bonus_territories_add_replace", type=str, default='add')
 
         # arguments for set connections
         ap.add_argument("--connection_type", default='normal')
@@ -151,11 +151,8 @@ class WZMapBuilder(inkex.EffectExtension):
             }[self.options.territory_tab],
             'bonuses': {
                 'create-update': self._set_bonus,
-                'bonus-territories': {
-                    BonusOperations.ADD_TERRITORIES: self._add_territories_to_bonus,
-                    BonusOperations.REPLACE_TERRITORIES: self._replace_territories_in_bonus,
-                }[BonusOperations(self.options.bonus_territories_tab)],
-                BonusOperations.DELETE.value: self._delete_bonus,
+                'bonus-territories': self._add_territories_to_bonus,
+                'delete': self._delete_bonus,
             }[self.options.bonus_tab],
             'connections': self._set_connection,
             'upload': self._upload_metadata,
@@ -248,15 +245,15 @@ class WZMapBuilder(inkex.EffectExtension):
         else:
             remove_bonus_link(bonus_link_path)
 
-    def _add_territories_to_bonus(
-            self, operation: BonusOperations = BonusOperations.ADD_TERRITORIES
-    ) -> None:
+    def _add_territories_to_bonus(self) -> None:
         """
-        Adds selected territories to bonus layer specified by a bonus name OR a selected bonus-link.
-        Raises an error if both are provided and don't have compatible names.
+        Adds or replaces selected territories for bonus layer specified by a bonus name OR a
+        selected bonus-link. Raises an error if both are provided and don't have compatible names.
         :return:
         """
+        operation = BonusOperations(self.options.bonus_territories_add_replace)
         self._clean_up_bonus_inputs(operation)
+
         bonus_layer = self.options.bonus_layer
         territory_groups = self.options.territories
 
@@ -280,15 +277,6 @@ class WZMapBuilder(inkex.EffectExtension):
         bonus_layer.add(*[clone for clone in territory_clones.values()])
         bonus_layer.add(*non_territory_elements)
         self._set_territory_stroke()
-
-    def _replace_territories_in_bonus(self) -> None:
-        """
-        Replaces existing territories in bonus layer specified by a bonus name OR a selected
-        bonus-link with the selected territories. Raises an error if both are provided and don't
-        have compatible names.
-        :return:
-        """
-        self._add_territories_to_bonus(BonusOperations.REPLACE_TERRITORIES)
 
     def _delete_bonus(self) -> None:
         self._clean_up_bonus_inputs(BonusOperations.DELETE)
@@ -609,11 +597,6 @@ class WZMapBuilder(inkex.EffectExtension):
             self.options.bonus_properties_tab
             if self.options.bonus_properties_tab in self.BONUS_CREATE_UPDATE_TAB_OPTIONS
             else 'create'
-        )
-        self.options.bonus_territories_tab = (
-            self.options.bonus_territories_tab
-            if self.options.bonus_territories_tab in self.BONUS_TERRITORY_TAB_OPTIONS
-            else 'add'
         )
 
     def _clean_up_bonus_inputs(self, operation: BonusOperations) -> None:

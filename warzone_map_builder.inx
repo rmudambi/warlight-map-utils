@@ -47,9 +47,9 @@
             <spacer/>
             <param name="connection_type" type="optiongroup" appearance="radio"
                    gui-text="Connection Type:" gui-description="Specify connection type">
-                <option value="Normal">Normal</option>
-                <option value="WrapHorizontally">Wrap Horizontally</option>
-                <option value="WrapVertically">Wrap Vertically</option>
+                <option value="Normal">  Normal</option>
+                <option value="WrapHorizontally">  Wrap Horizontally</option>
+                <option value="WrapVertically">  Wrap Vertically</option>
             </param>
         </page>
         <page name="bonuses" gui-text="Bonus">
@@ -96,22 +96,13 @@
                     </label>
                 </page>
                 <page name="bonus-territories" gui-text="Add/Replace Territories">
-                    <param name="bonus_territories_tab" type="notebook">
-                        <page name="add" gui-text="Add Territories">
-                            <label appearance="header">Add Territories to Bonus</label>
-                            <label>
-                                Adds selected territories to the bonus. The bonus name must be
-                                provided or a bonus link must be selected.
-                                <br/><br/>Existing territories will remain in the bonus.
-                            </label>
-                        </page>
-                        <page name="replace" gui-text="Replace Territories">
-                        <label appearance="header">Replace Territories in Bonus</label>
-                            <label>
-                                Replaces all territories in the bonus with the selected territories.
-                                The bonus name must be provided or a bonus link must be selected.
-                            </label>
-                        </page>
+                    <label appearance="header">Add or replace selected territories</label>
+                    <spacer/>
+                    <param name="bonus_territories_add_replace" type="optiongroup"
+                           appearance="radio" gui-text="Add or Replace Territory:"
+                           gui-description="Add or replace territories for this bonus.">
+                       <option value="add">  Add territories</option>
+                       <option value="replace">  Replace territories</option>
                     </param>
                 </page>
             </param>
