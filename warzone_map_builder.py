@@ -274,25 +274,20 @@ class WZMapBuilder(inkex.EffectExtension):
         bonus_layer = self.options.bonus_layer
         territory_groups = self.options.territories
 
-        non_territory_elements = []
-        territory_clones = {}
+        territory_clones = set()
         for element in bonus_layer.getchildren():
-            if isinstance(element, inkex.Title):
-                non_territory_elements.append(element)
-            else:
+            if isinstance(element, inkex.Use):
                 linked_element = element.href
-                if is_bonus_link_group(linked_element):
-                    non_territory_elements.append(element)
-                elif operation == Operation.ADD_TERRITORIES:
-                    territory_clones[linked_element.get_id()] = element
+                if is_territory_group(linked_element):
+                    if operation == Operation.REPLACE_TERRITORIES:
+                        bonus_layer.remove(element)
+                    else:
+                        territory_clones.add(linked_element.get_id())
 
         for territory_group in territory_groups:
             if not territory_group.get_id() in territory_clones:
-                territory_clones[territory_group.get_id()] = inkex.Use.new(territory_group, 0, 0)
-
-        bonus_layer.remove_all()
-        bonus_layer.add(*[clone for clone in territory_clones.values()])
-        bonus_layer.add(*non_territory_elements)
+                bonus_layer.insert(0, inkex.Use.new(territory_group, 0, 0))
+        
         self._set_territory_stroke()
 
     def _delete_bonus(self) -> None:
