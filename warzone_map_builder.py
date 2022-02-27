@@ -42,10 +42,13 @@ class Svg:
 
 class Inkscape:
     LABEL = 'inkscape:label'
+    GROUP_MODE = 'inkscape:groupmode'
     CONNECTION_START = 'inkscape:connection-start'
     CONNECTION_END = 'inkscape:connection-end'
     CONNECTOR_CURVATURE = 'inkscape:connector-curvature'
     CONNECTOR_TYPE = 'inkscape:connector-type'
+
+    LAYER = 'layer'
 
 
 class XLink:
@@ -91,7 +94,7 @@ class Warzone:
     ARMY_FONT_SIZE = 13     # px
 
 
-class BonusOperations(Enum):
+class Operation(Enum):
     CREATE = 'create'
     UPDATE = 'update'
     DELETE = 'delete'
@@ -101,7 +104,7 @@ class BonusOperations(Enum):
 
 class WZMapBuilder(inkex.EffectExtension):
 
-    TAB_OPTIONS = ['about', 'territories', 'bonuses', 'connections', 'upload']
+    TAB_OPTIONS = ['about', 'territories', 'connections', 'bonuses', 'distributions', 'upload']
     TERRITORY_TAB_OPTIONS = ['create', 'name']
     BONUS_TAB_OPTIONS = ['create-update', 'bonus-territories', 'delete']
     BONUS_CREATE_UPDATE_TAB_OPTIONS = ['create', 'update']
@@ -160,12 +163,12 @@ class WZMapBuilder(inkex.EffectExtension):
                 'create': self._create_territories,
                 'name': self._set_territory_name,
             }[self.options.territory_tab],
+            'connections': self._set_connection,
             'bonuses': {
                 'create-update': self._set_bonus,
                 'bonus-territories': self._add_territories_to_bonus,
                 'delete': self._delete_bonus,
             }[self.options.bonus_tab],
-            'connections': self._set_connection,
             'distributions': {
                 'crud': self._set_distribution_mode,
                 'distribution-territories': self._add_territories_to_distribution_mode
@@ -233,7 +236,7 @@ class WZMapBuilder(inkex.EffectExtension):
         Creates a bonus-link if necessary.
         :return:
         """
-        operation = BonusOperations(self.options.bonus_properties_tab)
+        operation = Operation(self.options.bonus_properties_tab)
         self._clean_up_bonus_inputs(operation)
 
         bonus_name = self.options.bonus_name
@@ -242,13 +245,12 @@ class WZMapBuilder(inkex.EffectExtension):
         bonus_link_path = self.options.bonus_link_path
         bonus_layer = self.options.bonus_layer
 
-        if BonusOperations.CREATE == operation:
+        if Operation.CREATE == operation:
             bonus_layer = inkex.Layer.new(f'{bonus_name}: {bonus_value}')
             bonus_layer.add(inkex.Title.new(bonus_color))
             self._get_metadata_layer(MapLayers.BONUSES).add(bonus_layer)
         else:
-            old_name, old_value = get_bonus_layer_name_and_value(bonus_layer)
-            bonus_name = bonus_name if bonus_name else old_name
+            _, old_value = get_bonus_layer_name_and_value(bonus_layer)
             bonus_value = bonus_value if bonus_value else old_value
             bonus_layer.set(Inkscape.LABEL, f'{bonus_name}: {bonus_value}')
             self.find(Svg.TITLE, bonus_layer).text = bonus_color
@@ -266,7 +268,7 @@ class WZMapBuilder(inkex.EffectExtension):
         selected bonus-link. Raises an error if both are provided and don't have compatible names.
         :return:
         """
-        operation = BonusOperations(self.options.bonus_territories_add_replace)
+        operation = Operation(self.options.bonus_territories_add_replace)
         self._clean_up_bonus_inputs(operation)
 
         bonus_layer = self.options.bonus_layer
@@ -281,7 +283,7 @@ class WZMapBuilder(inkex.EffectExtension):
                 linked_element = element.href
                 if is_bonus_link_group(linked_element):
                     non_territory_elements.append(element)
-                elif operation == BonusOperations.ADD_TERRITORIES:
+                elif operation == Operation.ADD_TERRITORIES:
                     territory_clones[linked_element.get_id()] = element
 
         for territory_group in territory_groups:
@@ -294,7 +296,7 @@ class WZMapBuilder(inkex.EffectExtension):
         self._set_territory_stroke()
 
     def _delete_bonus(self) -> None:
-        self._clean_up_bonus_inputs(BonusOperations.DELETE)
+        self._clean_up_bonus_inputs(Operation.DELETE)
 
         bonus_layer = self.options.bonus_layer
         bonus_link_path = self.options.bonus_link_path
@@ -337,11 +339,50 @@ class WZMapBuilder(inkex.EffectExtension):
 
     def _set_distribution_mode(self) -> None:
         """
-
+        Create, update, or delete distribution mode or scenarios.
         :return:
         """
-        # todo
-        pass
+        operation = Operation(self.options.distribution_crud_tab)
+        self._clean_up_distribution_inputs(operation)
+
+        distribution_name = self.options.distribution_name
+        scenario_names = self.options.distribution_scenario_names
+        distribution_layer = self.options.distribution_layer
+
+        if operation == Operation.CREATE:
+            distribution_layer = inkex.Layer.new(distribution_name)
+            scenario_layers = [inkex.Layer.new(scenario_name) for scenario_name in scenario_names]
+            distribution_layer.add(*scenario_layers)
+            self._get_metadata_layer(MapLayers.DISTRIBUTION_MODES).add(distribution_layer)
+        elif operation == Operation.UPDATE:
+            distribution_layer.set(Inkscape.LABEL, distribution_name)
+            if scenario_names:
+                for child in distribution_layer.getchildren():
+                    if not isinstance(child, inkex.Layer):
+                        distribution_layer.remove(child)
+
+                for scenario_name in scenario_names:
+                    scenario_layer = distribution_layer.get_or_create(
+                        f"./{Svg.GROUP}"
+                        f"[@{Inkscape.GROUP_MODE}='{Inkscape.LAYER}'"
+                        f" and @{Inkscape.LABEL}='{scenario_name}']",
+                        inkex.Layer
+                    )
+                    scenario_layer.set(Inkscape.LABEL, scenario_name)
+        elif operation == Operation.DELETE:
+            if not scenario_names:
+                distribution_layer.getparent().remove(distribution_layer)
+            else:
+                layers = {
+                    layer.get(Inkscape.LABEL): layer for layer in distribution_layer.getchildren()
+                }
+
+                for scenario_name in scenario_names:
+                    distribution_layer.remove(layers[scenario_name])
+        else:
+            raise AbortExtension(
+                f"Invalid distribution mode operation: '{self.options.distribution_crud_tab}'"
+            )
 
     def _add_territories_to_distribution_mode(self) -> None:
         """
@@ -640,22 +681,22 @@ class WZMapBuilder(inkex.EffectExtension):
             else 'create'
         )
 
-    def _clean_up_bonus_inputs(self, operation: BonusOperations) -> None:
+    def _clean_up_bonus_inputs(self, operation: Operation) -> None:
         """
         Gets true inputs for bonus name, bonus link, and bonus layer. Raises an informative
         exception if the bonus input doesn't validate.
         :return:
         """
-        is_create_update = operation in [BonusOperations.CREATE, BonusOperations.UPDATE]
+        is_create_update = operation in [Operation.CREATE, Operation.UPDATE]
         is_update_territories = operation in [
-            BonusOperations.ADD_TERRITORIES, BonusOperations.REPLACE_TERRITORIES
+            Operation.ADD_TERRITORIES, Operation.REPLACE_TERRITORIES
         ]
 
         bonus_name = self.options.bonus_name
         bonus_link = self._get_bonus_link_path_from_selection()
 
         if not bonus_name:
-            if BonusOperations.CREATE == operation:
+            if Operation.CREATE == operation:
                 raise AbortExtension("Must provide a bonus name when creating a new bonus.")
             if bonus_link is None:
                 raise AbortExtension(
@@ -671,7 +712,7 @@ class WZMapBuilder(inkex.EffectExtension):
             )
 
         bonus_name_update = (
-            self.options.bonus_name_update if BonusOperations.UPDATE == operation else bonus_name
+            self.options.bonus_name_update if Operation.UPDATE == operation else bonus_name
         )
 
         bonus_link = (
@@ -694,12 +735,7 @@ class WZMapBuilder(inkex.EffectExtension):
 
         target_bonus_layers = self._get_bonus_layers_with_name(bonus_name_update)
 
-        if is_create_update and target_bonus_layers:
-            raise AbortExtension(
-                f"Cannot create bonus '{bonus_name_update}' as bonus layers for this name already"
-                f" exist: {[layer.get(Inkscape.LABEL) for layer in target_bonus_layers]}."
-            )
-        if operation == BonusOperations.CREATE:
+        if operation == Operation.CREATE:
             bonus_layer = None
         else:
             existing_bonus_layers = (
@@ -707,14 +743,20 @@ class WZMapBuilder(inkex.EffectExtension):
                 else self._get_bonus_layers_with_name(bonus_name)
             )
             if not existing_bonus_layers:
-                operation = 'delete' if operation == BonusOperations.DELETE else 'modify'
-                raise AbortExtension(f"Cannot {operation} non-existent bonus.")
+                operation = 'delete' if operation == Operation.DELETE else 'modify'
+                raise AbortExtension(f"Cannot {operation} non-existent bonus '{bonus_name}'.")
             elif len(existing_bonus_layers) > 1:
                 raise AbortExtension(
                     f"Too many bonus layers match the bonus name {bonus_name}:"
                     f" {[layer.get(Inkscape.LABEL) for layer in existing_bonus_layers]}"
                 )
             bonus_layer = existing_bonus_layers[0]
+
+        if is_create_update and target_bonus_layers:
+            raise AbortExtension(
+                f"Cannot create bonus '{bonus_name_update}' as bonus layers for this name already"
+                f" exist: {[layer.get(Inkscape.LABEL) for layer in target_bonus_layers]}."
+            )
 
         if is_create_update:
             if not self.options.bonus_color:
@@ -733,7 +775,7 @@ class WZMapBuilder(inkex.EffectExtension):
                         f"If a bonus value is provided it must be an integer."
                         f" Provided '{self.options.bonus_value}'."
                     )
-            elif operation == BonusOperations.CREATE:
+            elif operation == Operation.CREATE:
                 raise AbortExtension(f"Must provide a bonus value when creating a new bonus.")
 
             try:
@@ -744,9 +786,86 @@ class WZMapBuilder(inkex.EffectExtension):
                     f" Provided {self.options.bonus_color}"
                 )
 
-        self.options.bonus_name = bonus_name_update
+        self.options.bonus_name = bonus_name_update if bonus_name_update else bonus_name
         self.options.bonus_link_path = bonus_link
         self.options.bonus_layer = bonus_layer
+
+    def _clean_up_distribution_inputs(self, operation: Operation) -> None:
+        is_create_update = operation in [Operation.CREATE, Operation.UPDATE]
+
+        distribution_name = self.options.distribution_name
+
+        if not distribution_name:
+            raise AbortExtension("Must provide a distribution mode name.")
+
+        distribution_name_update = (
+            self.options.distribution_name_update if Operation.UPDATE == operation
+            else distribution_name
+        )
+
+        target_distribution_layers = (
+            self._get_distribution_layers_with_name(distribution_name_update)
+        )
+
+        if operation == Operation.CREATE:
+            distribution_layer = None
+        else:
+            existing_distribution_layers = (
+                target_distribution_layers if distribution_name == distribution_name_update
+                else self._get_distribution_layers_with_name(distribution_name)
+            )
+            if not existing_distribution_layers:
+                operation = 'delete' if operation == Operation.DELETE else 'modify'
+                raise AbortExtension(
+                    f"Cannot {operation} non-existent bonus '{distribution_name}'."
+                )
+            elif len(existing_distribution_layers) > 1:
+                raise AbortExtension(
+                    f"Too many distribution mde layers match the distribution mode name"
+                    f" {distribution_name}:"
+                    f" {[layer.get(Inkscape.LABEL) for layer in existing_distribution_layers]}"
+                )
+            distribution_layer = existing_distribution_layers[0]
+
+        if is_create_update and target_distribution_layers:
+            raise AbortExtension(
+                f"Cannot create distribution mode '{distribution_name_update}' as distribution mode"
+                f" layers for this name already exist:"
+                f" {[layer.get(Inkscape.LABEL) for layer in target_distribution_layers]}."
+            )
+
+        # noinspection PyUnresolvedReferences
+        scenario_names = {
+            name for name in self.options.distribution_scenario_names.split('\\n') if name
+        }
+
+        if operation == Operation.CREATE and len(scenario_names) == 1:
+            raise AbortExtension(
+                "If creating a scenario distribution, you must provide at least TWO scenarios."
+            )
+        if operation == Operation.DELETE:
+            scenario_layer_names = {
+                    layer.get(Inkscape.LABEL) for layer in distribution_layer.getchildren()
+                }
+            if non_existent_layers := scenario_names - scenario_layer_names:
+                raise AbortExtension(f"Can't delete non-existent scenarios {non_existent_layers}.")
+            if len(remaining_layers := scenario_layer_names - scenario_names) < 2:
+                additional_message = (
+                    f"The only remaining scenario is '{remaining_layers.pop()}'."
+                    if remaining_layers else
+                    "There are no remaining layers. \n\nIf you want to delete the whole"
+                    " distribution, you shouldn't specify any scenarios."
+                )
+                raise AbortExtension(
+                    "There must be at least TWO scenarios left when deleting scenarios from a"
+                    f" scenario distribution. {additional_message}"
+                )
+
+        self.options.distribution_name = (
+            distribution_name_update if distribution_name_update else distribution_name
+        )
+        self.options.distribution_layer = distribution_layer
+        self.options.distribution_scenario_names = scenario_names
 
     #################
     # PARSING UTILS #
@@ -764,7 +883,7 @@ class WZMapBuilder(inkex.EffectExtension):
 
     def _get_metadata_layer(
             self,
-            metadata_type: str = None,
+            metadata_type: str,
             create: bool = False,
             parent: inkex.Layer = None
     ) -> inkex.Layer:
@@ -806,7 +925,7 @@ class WZMapBuilder(inkex.EffectExtension):
         slash = '//' if is_recursive else '/'
         bonus_layers = self.svg.xpath(
             f"./{Svg.GROUP}[@{Inkscape.LABEL}='{metadata_type}']"
-            f"{slash}{Svg.GROUP}[@{Inkscape.LABEL}]",
+            f"{slash}{Svg.GROUP}[@{Inkscape.GROUP_MODE}='{Inkscape.LAYER}']",
             namespaces=NSS
         )
         return bonus_layers
@@ -849,12 +968,18 @@ class WZMapBuilder(inkex.EffectExtension):
             if bonus_link_id == get_bonus_link_id(get_bonus_layer_name_and_value(layer)[0])
         ]
 
+    def _get_distribution_layers_with_name(self, distribution_name_update):
+        return (
+            self._get_metadata_layer(MapLayers.DISTRIBUTION_MODES)
+            .xpath(f"./{Svg.GROUP}[@{Inkscape.LABEL}='{distribution_name_update}']")
+        )
+
     ####################
     # METADATA SETTERS #
     ####################
 
     def _setup_map_layers(self):
-        # todo add distribution layers
+        self._get_metadata_layer(MapLayers.DISTRIBUTION_MODES, create=True)
         self._get_metadata_layer(MapLayers.BONUSES, create=True)
         self._get_metadata_layer(MapLayers.TERRITORIES, create=True)
 
