@@ -386,11 +386,28 @@ class WZMapBuilder(inkex.EffectExtension):
 
     def _add_territories_to_distribution_mode(self) -> None:
         """
-
+        Adds of replaces selected territories for distribution mode layer specified by distribution
+        mode name. Raises and error if a scenario is named for a non-scenario distribution mode or
+        if no scenario is named for a scenario distribution.
         :return:
         """
-        # todo
-        pass
+        operation = Operation(self.options.distribution_territories_add_replace)
+        self._clean_up_distribution_inputs(operation)
+
+        distribution_layer = self.options.distribution_layer
+        territory_groups = self.options.territories
+
+        if operation == Operation.REPLACE_TERRITORIES:
+            distribution_layer.remove_all()
+
+        existing_territory_ids = set()
+        for element in distribution_layer.getchildren():
+            linked_element = element.href
+            existing_territory_ids.add(linked_element.get_id())
+
+        for territory_group in territory_groups:
+            if not territory_group.get_id() in existing_territory_ids:
+                distribution_layer.add(inkex.Use.new(territory_group, 0, 0))
 
     def _upload_metadata(self) -> None:
         commands = self._get_set_metadata_commands()
@@ -721,17 +738,7 @@ class WZMapBuilder(inkex.EffectExtension):
         )
 
         if is_update_territories:
-            if selected_paths := self.svg.selection.filter(inkex.PathElement):
-                raise AbortExtension(
-                    f"Please convert all selected paths into territories before adding them to a"
-                    f" bonus: {[path.get_id() for path in selected_paths]}."
-                )
-
-            territories = [group for group in self.svg.selection if is_territory_group(group)]
-            if not territories:
-                raise AbortExtension("No territories have been selected.")
-
-            self.options.territories = territories
+            self._validate_add_territory_inputs()
 
         target_bonus_layers = self._get_bonus_layers_with_name(bonus_name_update)
 
@@ -792,6 +799,9 @@ class WZMapBuilder(inkex.EffectExtension):
 
     def _clean_up_distribution_inputs(self, operation: Operation) -> None:
         is_create_update = operation in [Operation.CREATE, Operation.UPDATE]
+        is_update_territories = operation in [
+            Operation.ADD_TERRITORIES, Operation.REPLACE_TERRITORIES
+        ]
 
         distribution_name = self.options.distribution_name
 
@@ -834,6 +844,30 @@ class WZMapBuilder(inkex.EffectExtension):
                 f" {[layer.get(Inkscape.LABEL) for layer in target_distribution_layers]}."
             )
 
+        if is_update_territories:
+            scenario_name = self.options.distribution_territory_scenario_name
+            if is_scenario_distribution(distribution_layer):
+                if not scenario_name:
+                    raise AbortExtension(
+                        "When adding a territory to a scenario distribution, you must provide the"
+                        " scenario name."
+                    )
+                distribution_layer = self.find(
+                    f"./{Svg.GROUP}[@{Inkscape.LABEL}='{scenario_name}']", distribution_layer
+                )
+                if distribution_layer is None:
+                    raise AbortExtension(
+                        f"Cannot add territories to scenario '{scenario_name}'. It is not a"
+                        f" scenario of distribution mode '{distribution_name}'"
+                    )
+            elif scenario_name:
+                raise AbortExtension(
+                    f"'{distribution_name}' is not a scenario distribution. Please remove the"
+                    f" scenario name."
+                )
+
+            self._validate_add_territory_inputs()
+
         # noinspection PyUnresolvedReferences
         scenario_names = {
             name for name in self.options.distribution_scenario_names.split('\\n') if name
@@ -866,6 +900,19 @@ class WZMapBuilder(inkex.EffectExtension):
         )
         self.options.distribution_layer = distribution_layer
         self.options.distribution_scenario_names = scenario_names
+
+    def _validate_add_territory_inputs(self) -> None:
+        if selected_paths := self.svg.selection.filter(inkex.PathElement):
+            raise AbortExtension(
+                f"Please convert all selected paths into territories before adding them to a"
+                f" bonus: {[path.get_id() for path in selected_paths]}."
+            )
+
+        territories = [group for group in self.svg.selection if is_territory_group(group)]
+        if not territories:
+            raise AbortExtension("No territories have been selected.")
+
+        self.options.territories = territories
 
     #################
     # PARSING UTILS #
@@ -1305,6 +1352,18 @@ def is_bonus_link_group(group: inkex.ShapeElement) -> bool:
     ) is not None
     valid = valid and find(f"./{Svg.TEXT}", group) is not None
     return valid
+
+
+def is_scenario_distribution(distribution_layer: inkex.Layer) -> bool:
+    """
+    Checks if the distribution layer is a scenario distribution layer. Assumes the input is a
+    distribution layer.
+    :param distribution_layer:
+    :return:
+    """
+    return bool(
+        [child for child in distribution_layer.getchildren() if isinstance(child, inkex.Layer)]
+    )
 
 
 def create_territory(
