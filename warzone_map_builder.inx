@@ -39,6 +39,13 @@
                         territory and an ellipse representing the desired location of the new center
                         point.
                     </label>
+                    <spacer/>
+                    <param name="center_point_set_type" type="optiongroup" appearance="radio"
+                           gui-text="Setting Method:"
+                           gui-description="Specify the method to designate the center point.">
+                        <option value="ellipse">  With an Ellipse</option>
+                        <option value="default">  Reset to Default</option>
+                    </param>
                 </page>
             </param>
         </page>

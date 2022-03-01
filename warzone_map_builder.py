@@ -119,6 +119,7 @@ class WZMapBuilder(inkex.EffectExtension):
         ap.add_argument("--territory_tab", type=str, default='create')
         ap.add_argument("--territory_name", type=str, default=Warzone.UNNAMED_TERRITORY_NAME)
         ap.add_argument("--territory_layer", type=inkex.Boolean, default=True)
+        ap.add_argument("--center_point_set_type", type=str, default='ellipse')
 
         # arguments for bonuses
         ap.add_argument("--bonus_name", type=str, default='')
@@ -231,7 +232,7 @@ class WZMapBuilder(inkex.EffectExtension):
         Sets the center point of the selected territory to the center of the selected ellipse.
         :return:
         """
-        if len(self.svg.selection) != 2:
+        if self.options.center_point_set_type == 'ellipse' and len(self.svg.selection) != 2:
             raise AbortExtension("Please select exactly one territory and one ellipse.")
 
         if elements := self.svg.selection.filter(inkex.PathElement):
@@ -241,22 +242,27 @@ class WZMapBuilder(inkex.EffectExtension):
             )
 
         territories = [element for element in self.svg.selection if is_territory_group(element)]
-        ellipse = self.svg.selection.filter(inkex.Ellipse, inkex.Circle).first()
-
-        if not territories or ellipse is None:
-            raise AbortExtension("Please select exactly one territory and one ellipse.")
-
         territory = territories.pop()
         bounding_box = self.find(f"./{Svg.PATH}", territory).bounding_box()
 
-        if (
-            not (bounding_box.left < ellipse.center.x < bounding_box.right)
-            or not (bounding_box.top < ellipse.center.y < bounding_box.bottom)
-        ):
-            raise AbortExtension("The center point must be within the territory.")
+        if self.options.center_point_set_type == 'default':
+            center = self.find(f'./{Svg.PATH}', territory).bounding_box().center
+        else:
+            ellipse = self.svg.selection.filter(inkex.Ellipse, inkex.Circle).first()
+
+            if territory is None or ellipse is None:
+                raise AbortExtension("Please select exactly one territory and one ellipse.")
+
+            if (
+                not (bounding_box.left < ellipse.center.x < bounding_box.right)
+                or not (bounding_box.top < ellipse.center.y < bounding_box.bottom)
+            ):
+                raise AbortExtension("The center point must be within the territory.")
+
+            center = ellipse.center
 
         territory.remove(self.find(f"./{Svg.GROUP}", territory))
-        center_point = create_center_point_group(ellipse.center)
+        center_point = create_center_point_group(center)
         territory.add(center_point)
 
     def _set_bonus(self) -> None:
