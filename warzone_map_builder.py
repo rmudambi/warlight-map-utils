@@ -246,10 +246,17 @@ class WZMapBuilder(inkex.EffectExtension):
         if not territories or ellipse is None:
             raise AbortExtension("Please select exactly one territory and one ellipse.")
 
-        center_point = create_center_point_group(ellipse.center)
-
         territory = territories.pop()
+        bounding_box = self.find(f"./{Svg.PATH}", territory).bounding_box()
+
+        if (
+            not (bounding_box.left < ellipse.center.x < bounding_box.right)
+            or not (bounding_box.top < ellipse.center.y < bounding_box.bottom)
+        ):
+            raise AbortExtension("The center point must be within the territory.")
+
         territory.remove(self.find(f"./{Svg.GROUP}", territory))
+        center_point = create_center_point_group(ellipse.center)
         territory.add(center_point)
 
     def _set_bonus(self) -> None:
