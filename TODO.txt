@@ -3,13 +3,17 @@ Set default center point using https://blog.mapbox.com/a-new-algorithm-for-findi
 Implement scenario distributions
 
 Create new extension/tab to prepare svg to be uploaded to warzone
+Upload territory names
+Upload center points
+Upload connections
+Upload bonuses
+Add territories to bonuses
+Upload distribution modes
+Add territories to distribution modes
 
 Change territory center point from the extension
     select an ellipse and a territory
     option to reset default
-Create distribution mode layers from the extension
-    input name and if is scenario distribution add scenario name
-    select territories to add to distribution
 Find unnamed territories
     find all territories with territory ids, but no name
 Find bonus-less territories
@@ -17,8 +21,8 @@ Find bonus-less territories
 Find connection-less territories
     find all territories with no connections
 
-Add gui-description to all tabs
-Add colons after each parameter name
+Use color picker to choose a bonus color
+
 Add option not to set territory stroke colors if that is slow
 Add ability to display only selected bonus/dist-mode (hide all other layers)
 Add ability to show/hide connections

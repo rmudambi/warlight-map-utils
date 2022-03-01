@@ -15,9 +15,14 @@
                 <page name="create" gui-text="Create Territories">
                     <label appearance="header">Converts Paths into Warzone Territories</label>
                     <label>Sets a Warzone Territory ID for all selected path elements. Additionally,
-                        adds a center-point with example army numbers. Ensures that all paths
+                        adds a center point with example army numbers. Ensures that all paths
                         with manually set Warzone Territory IDs have been processed.
                     </label>
+                    <spacer/>
+                    <param name="territory_layer" type="bool" gui-text="  Move to Territories layer"
+                           gui-description="If selected collect all territories into a single layer.">
+                        true
+                    </param>
                 </page>
                 <page name="name" gui-text="Territory Name">
                     <label appearance="header">Set Territory Name</label>
@@ -26,15 +31,15 @@
                         assigned and a center-point created.
                     </label>
                     <spacer/>
-                    <param name="territory_name" type="string" gui-text="Territory Name:    ">
-                        Unnamed
-                    </param>
+                    <param name="territory_name" type="string" gui-text="Territory Name:    "/>
                 </page>
-            </param>
-            <spacer/>
-            <param name="territory_layer" type="bool" gui-text="  Move to Territories layer"
-                   gui-description="If selected collect all territories into a single layer.">
-                true
+                <page name="center-point" gui-text="Center Point">
+                    <label appearance="header">Sets a Territory's Center Point</label>
+                    <label>Sets the center point for a Warzone Territory. Must select a single
+                        territory and an ellipse representing the desired location of the new center
+                        point.
+                    </label>
+                </page>
             </param>
         </page>
         <page name="connections" gui-text="Connections">

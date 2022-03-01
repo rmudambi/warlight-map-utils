@@ -105,7 +105,7 @@ class Operation(Enum):
 class WZMapBuilder(inkex.EffectExtension):
 
     TAB_OPTIONS = ['about', 'territories', 'connections', 'bonuses', 'distributions', 'upload']
-    TERRITORY_TAB_OPTIONS = ['create', 'name']
+    TERRITORY_TAB_OPTIONS = ['create', 'name', 'center-point']
     BONUS_TAB_OPTIONS = ['create-update', 'bonus-territories', 'delete']
     BONUS_CREATE_UPDATE_TAB_OPTIONS = ['create', 'update']
     BONUS_TERRITORY_TAB_OPTIONS = ['add', 'replace']
@@ -162,6 +162,7 @@ class WZMapBuilder(inkex.EffectExtension):
             'territories': {
                 'create': self._create_territories,
                 'name': self._set_territory_name,
+                'center-point': self._set_territory_center_point,
             }[self.options.territory_tab],
             'connections': self._set_connection,
             'bonuses': {
@@ -206,29 +207,50 @@ class WZMapBuilder(inkex.EffectExtension):
 
     def _set_territory_name(self) -> None:
         """
-        Sets the title of the selected path to the input name. If path isn't a Warzone Territory,
-        converts it into one. If territory-layer checkbox is checked, move to the Territories layer.
+        Sets the title of the selected territory to the input name.
         :return:
         """
 
         if len(self.svg.selection) != 1:
             raise AbortExtension("Please select exactly one territory.")
 
-        element = self.svg.selection.pop()
+        element = self.svg.selection.first()
         if isinstance(element, inkex.PathElement):
-            territory = element
-        elif is_territory_group(element):
-            territory = get_territories(element, is_recursive=False)[0]
-        else:
-            raise AbortExtension("You must select either a path or an existing territory group.")
+            raise AbortExtension(
+                f"Please convert selected path into a territory before setting its name:"
+                f" '{element.get_id()}'."
+            )
+        elif not is_territory_group(element):
+            raise AbortExtension("You must select the territory group you want to name.")
 
-        territory_layer = (
-            self._get_metadata_layer(MapLayers.TERRITORIES)
-            if self.options.territory_layer else None
-        )
+        title = element.get_or_create(f"./{Svg.TITLE}", inkex.Title)
+        title.text = self.options.territory_name
 
-        territory_group = create_territory(territory, self._get_max_territory_id(), territory_layer)
-        territory_group.add(inkex.Title.new(self.options.territory_name))
+    def _set_territory_center_point(self) -> None:
+        """
+        Sets the center point of the selected territory to the center of the selected ellipse.
+        :return:
+        """
+        if len(self.svg.selection) != 2:
+            raise AbortExtension("Please select exactly one territory and one ellipse.")
+
+        if elements := self.svg.selection.filter(inkex.PathElement):
+            raise AbortExtension(
+                f"Please convert selected path into a territory before setting its center point:"
+                f" '{elements.pop().get_id()}'."
+            )
+
+        territories = [element for element in self.svg.selection if is_territory_group(element)]
+        ellipse = self.svg.selection.filter(inkex.Ellipse, inkex.Circle).first()
+
+        if not territories or ellipse is None:
+            raise AbortExtension("Please select exactly one territory and one ellipse.")
+
+        center_point = create_center_point_group(ellipse.center)
+
+        territory = territories.pop()
+        territory.remove(self.find(f"./{Svg.GROUP}", territory))
+        territory.add(center_point)
 
     def _set_bonus(self) -> None:
         """
@@ -1362,7 +1384,7 @@ def is_scenario_distribution(distribution_layer: inkex.Layer) -> bool:
 
 
 def create_territory(
-        territory: inkex.PathElement, max_id: int, territory_layer: inkex.Layer = None
+        territory_path: inkex.PathElement, max_id: int, territory_layer: inkex.Layer = None
 ) -> inkex.Group:
     """
     Converts territory path into a Warzone Territory.
@@ -1372,22 +1394,24 @@ def create_territory(
     territory_layer argument is passed, move territory group to the Territories layer.
 
     :param max_id:
-    :param territory:
+    :param territory_path:
     :param territory_layer:
     :return maximum territory id as int
     """
-    if Warzone.TERRITORY_IDENTIFIER not in territory.get_id():
+    if Warzone.TERRITORY_IDENTIFIER not in territory_path.get_id():
         max_id += 1
-        territory.set_id(f"{Warzone.TERRITORY_IDENTIFIER}{max_id}")
-    parent: inkex.Group = territory.getparent()
+        territory_path.set_id(f"{Warzone.TERRITORY_IDENTIFIER}{max_id}")
+    parent: inkex.Group = territory_path.getparent()
     if not is_territory_group(parent):
         territory_group = inkex.Group.new(
-            territory.get_id(), territory, create_center_point_group(territory),
+            territory_path.get_id(),
+            territory_path,
+            create_center_point_group(territory_path.bounding_box().center),
         )
     else:
         territory_group = parent
         parent = territory_group.getparent()
-    territory_style = territory.effective_style()
+    territory_style = territory_path.effective_style()
     territory_style[Svg.STROKE_WIDTH] = 1
     if territory_style.get_color() != Color.TERRITORY_FILL:
         territory_style.set_color(Color.TERRITORY_FILL)
@@ -1411,19 +1435,18 @@ def remove_bonus_link(bonus_link: Union[inkex.Group, inkex.PathElement]) -> None
         element_to_remove.getparent().remove(element_to_remove)
 
 
-def create_center_point_group(territory: Union[inkex.Group, inkex.PathElement]) -> inkex.Group:
+def create_center_point_group(center: inkex.Vector2d) -> inkex.Group:
     """
     Creates a group containing a rounded rectangle and sample army numbers centered at the
-    territory's center-point
-    :param territory:
+    input center-point
+    :param center
     :return:
     center point group
     """
     # todo use https://blog.mapbox.com/a-new-algorithm-for-finding-a-visual-center-of-a-polygon-7c77e6492fbc
     #  to set a default center point
-    center = territory.bounding_box().center
     return inkex.Group.new(
-        territory.get_id(),
+        'center-point',
         inkex.Rectangle.new(
             left=center.x - Warzone.RECT_WIDTH / 2,
             top=center.y - Warzone.RECT_HEIGHT / 2,
