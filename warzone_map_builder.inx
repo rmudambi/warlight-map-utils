@@ -173,16 +173,30 @@
         </page>
         <page name="upload" gui-text="Upload Metadata">
             <label appearance="header">Load Map Metadata to Warzone</label>
-            <param name="upload_email" type="string" gui-text="Warzone Email Address"/>
-            <param name="upload_api_token" type="string" gui-text="Warzone API Token"/>
-            <param name="upload_map_id" type="int" min="0" max="9999999" gui-text="Warzone Map ID"/>
-            <param name="upload_territory_names" type="bool" gui-text="Set Territory Names">false</param>
-            <param name="upload_territory_center_points" type="bool" gui-text="Set Territory Center Points">false</param>
-            <param name="upload_connections" type="bool" gui-text="Set Connections">false</param>
-            <param name="upload_bonuses" type="bool" gui-text="Add Bonuses">false</param>
-            <param name="upload_territory_bonuses" type="bool" gui-text="Add Territories to Bonuses">false</param>
-            <param name="upload_distribution_modes" type="bool" gui-text="Add Distribution Modes">false</param>
-            <param name="upload_territory_distribution_modes" type="bool" gui-text="Add Territories to Distribution Modes">false</param>
+            <param name="upload_email" type="string" gui-text="Warzone Email Address:    "
+                   gui-description="Provide the email associated with your Warzone account."/>
+            <param name="upload_api_token" type="string" gui-text="Warzone API Token:    "
+                   gui-description="Provide your account's API Token. See https://www.warzone.com/wiki/Get_API_Token_API for getting your API Token."/>
+            <param name="upload_map_id" type="int" min="0" max="9999999"
+                   gui-text="Warzone Map ID:    "
+                   gui-description="Provide your map's ID number. This is the numeric part of a URL like this https://www.warzone.com/SinglePlayer?PreviewMap=55555"/>
+            <param name="upload_territory_names" type="bool" gui-text="  Set Territory Names"
+                   gui-description="Upload territory names to Warzone.">false</param>
+            <param name="upload_territory_center_points" type="bool"
+                   gui-text="  Set Territory Center Points"
+                   gui-description="Upload territory center points to Warzone.">false</param>
+            <param name="upload_connections" type="bool" gui-text="  Set Connections"
+                   gui-description="Upload territory connections to Warzone.">false</param>
+            <param name="upload_bonuses" type="bool" gui-text="  Add Bonuses"
+                   gui-description="Upload bonuses to Warzone.">false</param>
+            <param name="upload_territory_bonuses" type="bool"
+                   gui-text="  Add Territories to Bonuses"
+                   gui-description="Add territories to bonuses on Warzone.">false</param>
+            <param name="upload_distribution_modes" type="bool" gui-text="  Add Distribution Modes"
+                   gui-description="Upload distribution modes to Warzone.">false</param>
+            <param name="upload_territory_distribution_modes" type="bool"
+                   gui-text="  Add Territories to Distribution Modes"
+                   gui-description="Add territories to distribution modes on Warzone.">false</param>
         </page>
     </param>
     <effect needs-live-preview="false">

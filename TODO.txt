@@ -11,9 +11,6 @@ Add territories to bonuses
 Upload distribution modes
 Add territories to distribution modes
 
-Change territory center point from the extension
-    select an ellipse and a territory
-    option to reset default
 Find unnamed territories
     find all territories with territory ids, but no name
 Find bonus-less territories
