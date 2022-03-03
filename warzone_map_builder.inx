@@ -50,11 +50,10 @@
             </param>
         </page>
         <page name="connections" gui-text="Connections">
-            <label appearance="header">Toggle Connection</label>
+            <label appearance="header">Create Connection</label>
             <label>
                 Creates a connection between two selected territories if they are currently not
-                connected and removes the connection if they are. Can create vertically or
-                horizontally wrapping connections.
+                connected. Can create vertically or horizontally wrapping connections.
             </label>
             <spacer/>
             <param name="connection_type" type="optiongroup" appearance="radio"

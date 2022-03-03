@@ -287,7 +287,7 @@ class WZMapBuilder(inkex.EffectExtension):
         else:
             _, old_value = get_bonus_layer_name_and_value(bonus_layer)
             bonus_value = bonus_value if bonus_value else old_value
-            bonus_layer.set(Inkscape.LABEL, f'{bonus_name}: {bonus_value}')
+            bonus_layer.label = f'{bonus_name}: {bonus_value}'
             self.find(Svg.TITLE, bonus_layer).text = bonus_color
 
         if self.options.bonus_link_visible:
@@ -385,7 +385,7 @@ class WZMapBuilder(inkex.EffectExtension):
             distribution_layer.add(*scenario_layers)
             self._get_metadata_layer(MapLayers.DISTRIBUTION_MODES).add(distribution_layer)
         elif operation == Operation.UPDATE:
-            distribution_layer.set(Inkscape.LABEL, distribution_name)
+            distribution_layer.label = distribution_name
             if scenario_names:
                 for child in distribution_layer.getchildren():
                     if not isinstance(child, inkex.Layer):
@@ -398,13 +398,13 @@ class WZMapBuilder(inkex.EffectExtension):
                         f" and @{Inkscape.LABEL}='{scenario_name}']",
                         inkex.Layer
                     )
-                    scenario_layer.set(Inkscape.LABEL, scenario_name)
+                    scenario_layer.label = scenario_name
         elif operation == Operation.DELETE:
             if not scenario_names:
                 distribution_layer.getparent().remove(distribution_layer)
             else:
                 layers = {
-                    layer.get(Inkscape.LABEL): layer for layer in distribution_layer.getchildren()
+                    layer.label: layer for layer in distribution_layer.getchildren()
                 }
 
                 for scenario_name in scenario_names:
@@ -533,34 +533,15 @@ class WZMapBuilder(inkex.EffectExtension):
         :return:
         List of addTerritoryConnection commands
         """
-        connection_type_layers = self._get_metadata_type_layers(MapLayers.CONNECTIONS)
-
-        commands = []
-        for connection_type_layer in connection_type_layers:
-            for connection_layer in connection_type_layer:
-                def local_get_territory_id(attribute: str) -> int:
-                    link_id = connection_layer.get(get_uri(attribute))[1:]
-                    # todo handle top-level territories
-                    #  - currently only works if territory node is one layer below linked node
-                    #  - probably want to separate center point from group and key on that
-                    #  - possible solution (likely most user friendly) is to automatically detect
-                    #       which territory a center point corresponds with
-                    territory = self.svg.xpath(
-                        f".//*[@{Svg.ID}='{link_id}']"
-                        f"/{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}')]",
-                        namespaces=NSS
-                    )[0]
-                    return get_territory_id(territory.get(Svg.ID))
-
-                command = {
-                    'command': 'addTerritoryConnection',
-                    'id1': local_get_territory_id(Inkscape.CONNECTION_START),
-                    'id2': local_get_territory_id(Inkscape.CONNECTION_END),
-                    'wrap': connection_type_layer.get(get_uri(Inkscape.LABEL))
-                }
-                commands.append(command)
-
-        return commands
+        return [
+            {
+                'command': 'addTerritoryConnection',
+                'id1': self.get_connection_endpoint_id(connection, Inkscape.CONNECTION_START),
+                'id2': self.get_connection_endpoint_id(connection, Inkscape.CONNECTION_END),
+                'wrap': connection.getparent().label
+            }
+            for connection in get_connections(self._get_metadata_layer(MapLayers.CONNECTIONS))
+        ]
 
     def _get_add_bonus_commands(self) -> List[Command]:
         """
@@ -768,14 +749,14 @@ class WZMapBuilder(inkex.EffectExtension):
             elif len(existing_bonus_layers) > 1:
                 raise AbortExtension(
                     f"Too many bonus layers match the bonus name {bonus_name}:"
-                    f" {[layer.get(Inkscape.LABEL) for layer in existing_bonus_layers]}"
+                    f" {[layer.label for layer in existing_bonus_layers]}"
                 )
             bonus_layer = existing_bonus_layers[0]
 
         if is_create_update and target_bonus_layers:
             raise AbortExtension(
                 f"Cannot create bonus '{bonus_name_update}' as bonus layers for this name already"
-                f" exist: {[layer.get(Inkscape.LABEL) for layer in target_bonus_layers]}."
+                f" exist: {[layer.label for layer in target_bonus_layers]}."
             )
 
         if is_create_update:
@@ -846,7 +827,7 @@ class WZMapBuilder(inkex.EffectExtension):
                 raise AbortExtension(
                     f"Too many distribution mde layers match the distribution mode name"
                     f" {distribution_name}:"
-                    f" {[layer.get(Inkscape.LABEL) for layer in existing_distribution_layers]}"
+                    f" {[layer.label for layer in existing_distribution_layers]}"
                 )
             distribution_layer = existing_distribution_layers[0]
 
@@ -854,7 +835,7 @@ class WZMapBuilder(inkex.EffectExtension):
             raise AbortExtension(
                 f"Cannot create distribution mode '{distribution_name_update}' as distribution mode"
                 f" layers for this name already exist:"
-                f" {[layer.get(Inkscape.LABEL) for layer in target_distribution_layers]}."
+                f" {[layer.label for layer in target_distribution_layers]}."
             )
 
         if is_update_territories:
@@ -891,9 +872,7 @@ class WZMapBuilder(inkex.EffectExtension):
                 "If creating a scenario distribution, you must provide at least TWO scenarios."
             )
         if operation == Operation.DELETE:
-            scenario_layer_names = {
-                    layer.get(Inkscape.LABEL) for layer in distribution_layer.getchildren()
-                }
+            scenario_layer_names = {layer.label for layer in distribution_layer.getchildren()}
             if non_existent_layers := scenario_names - scenario_layer_names:
                 raise AbortExtension(f"Can't delete non-existent scenarios {non_existent_layers}.")
             if len(remaining_layers := scenario_layer_names - scenario_names) < 2:
@@ -989,6 +968,17 @@ class WZMapBuilder(inkex.EffectExtension):
             namespaces=NSS
         )
         return bonus_layers
+
+    def get_connection_endpoint_id(self, connection: inkex.PathElement, endpoint_type: str) -> int:
+        """
+        Get the numeric id of the start territory of the connection
+        :param connection:
+        :param endpoint_type
+        :return:
+        """
+        rectangle_id = connection.get(get_uri(endpoint_type)).split('#')[-1]
+        territory_group = self.svg.getElementById(rectangle_id).getparent().getparent()
+        return get_territory_id(territory_group)
 
     def _get_bonus_link_path_from_name(self, bonus_name: str) -> inkex.PathElement:
         """
@@ -1105,7 +1095,7 @@ class WZMapBuilder(inkex.EffectExtension):
                 ),
             )
 
-        bonus_link.set(Inkscape.LABEL, bonus_link_id)
+        bonus_link.label = bonus_link_id
 
         # Set bonus link font color
         tspan = find(f"./{Svg.TEXT}/{Svg.TSPAN}", bonus_link)
@@ -1198,7 +1188,7 @@ class WZMapBuilder(inkex.EffectExtension):
 
             # update bonus name if name or value has changed
             new_bonus_name = self.options.bonus_name if self.options.bonus_name else old_bonus_name
-            bonus_layer.set(Inkscape.LABEL, f'{new_bonus_name}: {bonus_value}')
+            bonus_layer.label = f'{new_bonus_name}: {bonus_value}'
 
         return bonus_layer
 
@@ -1353,6 +1343,23 @@ def get_territory_center(territory: inkex.Group) -> inkex.Vector2d:
     )
 
 
+def get_connections(
+        root: inkex.BaseElement, is_recursive: bool = True
+) -> List[inkex.PathElement]:
+    """
+    Gets all connections that are children of the root node. If not is_recursive, gets
+    only direct children.
+    :param root:
+    :param is_recursive:
+    :return:
+    """
+    slash = '//' if is_recursive else '/'
+    return root.xpath(
+        f".{slash}{Svg.PATH}[@{Inkscape.CONNECTION_START} and @{Inkscape.CONNECTION_END}]",
+        namespaces=NSS
+    )
+
+
 def get_bonus_layer_name_and_value(bonus_layer: inkex.Layer) -> Tuple[str, int]:
     """
     Parses a bonus layer's label to get the bonus name and value.
@@ -1360,7 +1367,7 @@ def get_bonus_layer_name_and_value(bonus_layer: inkex.Layer) -> Tuple[str, int]:
     :return:
     tuple of bonus name and bonus value
     """
-    bonus_name, bonus_value = bonus_layer.get(get_uri(Inkscape.LABEL)).split(': ')
+    bonus_name, bonus_value = bonus_layer.label.split(': ')
     return bonus_name, int(bonus_value)
 
 
