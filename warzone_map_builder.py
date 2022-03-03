@@ -492,58 +492,37 @@ class WZMapBuilder(inkex.EffectExtension):
         :return:
         List of setTerritoryName commands
         """
-        territories = {
-            get_territory_id(territory): territory.getparent()
-            for territory in get_territories(self.svg)
-        }
-
-        named_territories = {
-            territory_id: get_territory_name(territory)
-            for territory_id, territory in territories.items()
-            if is_territory_group(territory)
-        }
-
-        commands = [
+        return [
             {
                 'command': 'setTerritoryName',
-                'id': territory_id,
-                'name': territory_name
-            } for territory_id, territory_name in named_territories.items() if territory_name
+                'id': get_territory_id(territory_group),
+                'name': get_territory_name(territory_group)
+            }
+            for territory_group in get_territory_groups(self.svg, is_recursive=True)
+            if get_territory_name(territory_group)
         ]
-        return commands
 
     def _get_set_territory_center_point_commands(self) -> List[Command]:
         """
         Parses svg and sets territory center points.
 
-        A command is created for each group that has a territory and an ellipse in it.
+        A command is created for each Territory
         :return:
         List of setTerritoryCenterPoint commands
         """
-        groups = self.svg.xpath(
-            f".//{Svg.GROUP}["
-            f"  {Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}')]"
-            f"  and .//{Svg.ELLIPSE}"
-            f"]",
-            namespaces=NSS
-        )
+        territory_centers = {
+            get_territory_id(territory_group): get_territory_center(territory_group)
+            for territory_group in get_territory_groups(self.svg, is_recursive=True)
+        }
 
-        commands = []
-        for group in groups:
-            territory = group.find(f"./{Svg.PATH}", NSS)
-            territory_id = get_territory_id(territory)
-            # todo account for matrix transformations in getting center point
-            center_ellipse: inkex.Ellipse = group.find(f"./{Svg.ELLIPSE}", NSS)
-            x, y = center_ellipse.center
-            command = {
+        return [
+            {
                 'command': 'setTerritoryCenterPoint',
                 'id': territory_id,
-                'x': x,
-                'y': y
-            }
-            commands.append(command)
-
-        return commands
+                'x': center_point.x,
+                'y': center_point.y
+            } for territory_id, center_point in territory_centers.items()
+        ]
 
     def _get_add_territory_connections_commands(self) -> List[Command]:
         """
@@ -1311,6 +1290,15 @@ def get_territories(
     )
 
 
+def get_territory_groups(
+        root: inkex.BaseElement, is_recursive: bool = True
+) -> List[inkex.Group]:
+    return [
+        territory.getparent() for territory in get_territories(root, is_recursive)
+        if is_territory_group(territory.getparent())
+    ]
+
+
 def get_territory_id(territory: Union[str,  inkex.PathElement, inkex.Use, inkex.Group]) -> int:
     """
     Returns the id of the territory. If the argument is a string it must be of the form
@@ -1348,6 +1336,21 @@ def get_territory_name(territory: inkex.Group) -> str:
     else:
         territory_name = None
     return territory_name
+
+
+def get_territory_center(territory: inkex.Group) -> inkex.Vector2d:
+    """
+    Get the name of the territory from its child title element. If no title, returns
+    Warzone.UNNAMED_TERRITORY_NAME
+    :param territory:
+    :return:
+    territory name
+    """
+    center_rectangle: inkex.Rectangle = territory.find(f"./{Svg.GROUP}/{Svg.RECTANGLE}", NSS)
+    return inkex.Vector2d(
+        center_rectangle.left + center_rectangle.rx / 2,
+        center_rectangle.top + center_rectangle.ry / 2
+    )
 
 
 def get_bonus_layer_name_and_value(bonus_layer: inkex.Layer) -> Tuple[str, int]:

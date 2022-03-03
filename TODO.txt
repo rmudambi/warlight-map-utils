@@ -3,13 +3,11 @@ Set default center point using https://blog.mapbox.com/a-new-algorithm-for-findi
 Implement scenario distributions
 
 Create new extension/tab to prepare svg to be uploaded to warzone
-Upload territory names
-Upload center points
-Upload connections
-Upload bonuses
-Add territories to bonuses
-Upload distribution modes
-Add territories to distribution modes
+    Upload connections
+    Upload bonuses
+    Add territories to bonuses
+    Upload distribution modes
+    Add territories to distribution modes
 
 Find unnamed territories
     find all territories with territory ids, but no name
