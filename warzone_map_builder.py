@@ -285,8 +285,7 @@ class WZMapBuilder(inkex.EffectExtension):
             bonus_layer.add(inkex.Title.new(bonus_color))
             self._get_metadata_layer(MapLayers.BONUSES).add(bonus_layer)
         else:
-            _, old_value = get_bonus_layer_name_and_value(bonus_layer)
-            bonus_value = bonus_value if bonus_value else old_value
+            bonus_value = bonus_value if bonus_value else get_bonus_value(bonus_layer)
             bonus_layer.label = f'{bonus_name}: {bonus_value}'
             self.find(Svg.TITLE, bonus_layer).text = bonus_color
 
@@ -555,34 +554,16 @@ class WZMapBuilder(inkex.EffectExtension):
         :return:
         List of addBonus commands
         """
-        bonus_links: Dict[str, inkex.PathElement] = {
-            bonus_link.get(Svg.ID): bonus_link
-            for bonus_link in self.svg.xpath(
-                f".//{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.BONUS_LINK_IDENTIFIER}')]",
-                namespaces=NSS
-            )
-        }
-        bonus_layer_nodes = self._get_metadata_type_layers(MapLayers.BONUSES)
 
-        commands = []
-        for bonus_layer in bonus_layer_nodes:
-            bonus_name, bonus_value = get_bonus_layer_name_and_value(bonus_layer)
-            bonus_link_node = bonus_links.get(get_bonus_link_id(bonus_name))
-            if bonus_link_node is not None:
-                node_style = bonus_link_node.composed_style()
-                bonus_color = node_style[Svg.FILL].upper()
-            else:
-                bonus_color = Color.DEFAULT_BONUS_COLOR
-
-            command = {
+        return [
+            {
                 'command': 'addBonus',
-                'name': bonus_name,
-                'armies': bonus_value,
-                'color': bonus_color
+                'name': get_bonus_name(bonus),
+                'armies': get_bonus_value(bonus),
+                'color': get_bonus_color(bonus)
             }
-            commands.append(command)
-
-        return commands
+            for bonus in self._get_metadata_type_layers(MapLayers.BONUSES)
+        ]
 
     def _get_add_territory_to_bonus_commands(self) -> List[Command]:
         """
@@ -601,7 +582,7 @@ class WZMapBuilder(inkex.EffectExtension):
             {
                 'command': 'addTerritoryToBonus',
                 'id': get_territory_id(territory),
-                'bonusName': get_bonus_layer_name_and_value(bonus_layer)[0]
+                'bonusName': get_bonus_name(bonus_layer)
             } for bonus_layer in bonus_layers
             for territory in bonus_layer.xpath(f"./{Svg.CLONE}", namespaces=NSS)
         ]
@@ -1015,7 +996,7 @@ class WZMapBuilder(inkex.EffectExtension):
         bonus_link_id = get_bonus_link_id(bonus_name)
         return [
             layer for layer in self._get_metadata_type_layers(MapLayers.BONUSES)
-            if bonus_link_id == get_bonus_link_id(get_bonus_layer_name_and_value(layer)[0])
+            if bonus_link_id == get_bonus_link_id(get_bonus_name(layer))
         ]
 
     def _get_distribution_layers_with_name(self, distribution_name_update):
@@ -1129,7 +1110,7 @@ class WZMapBuilder(inkex.EffectExtension):
                 return [
                     layer for layer in bonus_layers
                     if bonus_name == get_bonus_link_id(
-                        get_bonus_layer_name_and_value(layer)[0]
+                        get_bonus_name(layer)
                     ).split(Warzone.BONUS_LINK_IDENTIFIER)[-1]
                 ]
 
@@ -1144,14 +1125,11 @@ class WZMapBuilder(inkex.EffectExtension):
             bonus_link_id = bonus_link.get_id().split(Warzone.BONUS_LINK_IDENTIFIER)[-1]
             matching_bonus_layers = find_bonus_layers_with_name(bonus_link_id)
             if len(matching_bonus_layers) == 1:
-                old_bonus_name = get_bonus_layer_name_and_value(matching_bonus_layers[0])[0]
+                old_bonus_name = get_bonus_name(matching_bonus_layers[0])
             elif len(matching_bonus_layers) > 1:
-                matching_layer_names = [
-                    get_bonus_layer_name_and_value(layer) for layer in matching_bonus_layers
-                ]
                 raise AbortExtension(
                     f"Multiple bonus layers exist matching bonus link {bonus_link_id}: "
-                    f"{matching_layer_names}"
+                    f"{[layer.label for layer in matching_bonus_layers]}"
                 )
 
         # get bonuses layer
@@ -1177,7 +1155,7 @@ class WZMapBuilder(inkex.EffectExtension):
             try:
                 bonus_value = int(
                     self.options.bonus_value if self.options.bonus_value != ''
-                    else get_bonus_layer_name_and_value(bonus_layer)[1]
+                    else get_bonus_name(bonus_layer)[1]
                 )
                 self.options.bonus_value = str(bonus_value)
             except ValueError:
@@ -1360,15 +1338,31 @@ def get_connections(
     )
 
 
-def get_bonus_layer_name_and_value(bonus_layer: inkex.Layer) -> Tuple[str, int]:
+def get_bonus_name(bonus_layer: inkex.Layer) -> str:
     """
-    Parses a bonus layer's label to get the bonus name and value.
+    Parses a bonus layer's label to get the bonus name
     :param bonus_layer:
     :return:
-    tuple of bonus name and bonus value
     """
-    bonus_name, bonus_value = bonus_layer.label.split(': ')
-    return bonus_name, int(bonus_value)
+    return ': '.join(bonus_layer.label.split(': ')[:-1])
+
+
+def get_bonus_value(bonus_layer: inkex.Layer) -> int:
+    """
+    Parses a bonus layer's label to get the bonus value.
+    :param bonus_layer:
+    :return:
+    """
+    return int(bonus_layer.label.split(': ')[-1])
+
+
+def get_bonus_color(bonus_layer: inkex.Layer) -> str:
+    """
+    Parses a bonus layer's title to get the bonus color.
+    :param bonus_layer:
+    :return:
+    """
+    return find(Svg.TITLE, bonus_layer).text
 
 
 def get_bonus_link_id(bonus_name: str) -> str:
