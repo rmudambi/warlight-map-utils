@@ -452,9 +452,9 @@ class WZMapBuilder(inkex.EffectExtension):
         response = requests.post(
             url=SET_MAP_DETAILS_URL,
             json={
-                'email': self.options.email,
-                'APIToken': self.options.api_token,
-                'mapID': self.options.map_id,
+                'email': self.options.upload_email,
+                'APIToken': self.options.upload_api_token,
+                'mapID': self.options.upload_map_id,
                 'commands': commands,
             }
         )
@@ -487,24 +487,28 @@ class WZMapBuilder(inkex.EffectExtension):
         """
         Parses svg and creates setTerritoryName commands.
 
-        A command is created for each path whose ID signifies it is a Warzone Territory (i.e. starts
-        with the Warzone.TERRITORY_IDENTIFIER) and also has a title.
+        A command is created for each territory group with a title.
 
         :return:
         List of setTerritoryName commands
         """
-        territories = self.svg.xpath(
-            # todo look only in territory layer
-            f".//{Svg.PATH}[contains(@{Svg.ID}, '{Warzone.TERRITORY_IDENTIFIER}') and {Svg.TITLE}]",
-            namespaces=NSS
-        )
+        territories = {
+            get_territory_id(territory): territory.getparent()
+            for territory in get_territories(self.svg)
+        }
+
+        named_territories = {
+            territory_id: get_territory_name(territory)
+            for territory_id, territory in territories.items()
+            if is_territory_group(territory)
+        }
 
         commands = [
             {
                 'command': 'setTerritoryName',
-                'id': get_territory_id(territory),
-                'name': get_territory_name(territory)
-            } for territory in territories
+                'id': territory_id,
+                'name': territory_name
+            } for territory_id, territory_name in named_territories.items() if territory_name
         ]
         return commands
 
@@ -1330,7 +1334,7 @@ def get_territory_id(territory: Union[str,  inkex.PathElement, inkex.Use, inkex.
     return int(territory_id)
 
 
-def get_territory_name(territory: inkex.PathElement) -> str:
+def get_territory_name(territory: inkex.Group) -> str:
     """
     Get the name of the territory from its child title element. If no title, returns
     Warzone.UNNAMED_TERRITORY_NAME
@@ -1342,7 +1346,7 @@ def get_territory_name(territory: inkex.PathElement) -> str:
     if title is not None:
         territory_name = title.text
     else:
-        territory_name = Warzone.UNNAMED_TERRITORY_NAME
+        territory_name = None
     return territory_name
 
 
