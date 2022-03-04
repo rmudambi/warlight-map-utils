@@ -602,19 +602,18 @@ class WZMapBuilder(inkex.EffectExtension):
         :return:
         List of addDistributionMode commands
         """
-        distribution_mode_layers = self._get_metadata_type_layers(
-            MapLayers.DISTRIBUTION_MODES, is_recursive=False
-        )
-        # todo implement adding scenario distributions modes
-        #  determine if scenario distribution mode
-        #  get scenario names
-
-        commands = [
-            {
+        distribution_mode_layer = self._get_metadata_layer(MapLayers.DISTRIBUTION_MODES)
+        commands = []
+        for distribution_mode in distribution_mode_layer.getchildren():
+            command = {
                 'command': 'addDistributionMode',
-                'name': distribution_mode_layer.get(get_uri(Inkscape.LABEL)),
-            } for distribution_mode_layer in distribution_mode_layers
-        ]
+                'name': distribution_mode.label
+            }
+            if scenarios := [
+                child for child in distribution_mode.getchildren() if isinstance(child, inkex.Layer)
+            ]:
+                command['scenarios'] = [scenario.label for scenario in scenarios]
+            commands.append(command)
         return commands
 
     def _get_add_territory_to_distribution_commands(self) -> List[Command]:
