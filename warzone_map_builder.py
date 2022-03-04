@@ -578,14 +578,18 @@ class WZMapBuilder(inkex.EffectExtension):
         List of addTerritoryToBonus commands
         """
         bonus_layers = self._get_metadata_type_layers(MapLayers.BONUSES)
-        commands = [
-            {
-                'command': 'addTerritoryToBonus',
-                'id': get_territory_id(territory),
-                'bonusName': get_bonus_name(bonus_layer)
-            } for bonus_layer in bonus_layers
-            for territory in bonus_layer.xpath(f"./{Svg.CLONE}", namespaces=NSS)
-        ]
+
+        commands = []
+        for bonus_layer in bonus_layers:
+            for element in bonus_layer.getchildren():
+                if isinstance(element, inkex.Use):
+                    linked_element = element.href
+                    if is_territory_group(linked_element):
+                        commands.append({
+                            'command': 'addTerritoryToBonus',
+                            'id': get_territory_id(linked_element),
+                            'bonusName': get_bonus_name(bonus_layer)
+                        })
         return commands
 
     def _get_add_distribution_mode_commands(self) -> List[Command]:
