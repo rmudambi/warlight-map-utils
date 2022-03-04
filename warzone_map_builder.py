@@ -609,10 +609,10 @@ class WZMapBuilder(inkex.EffectExtension):
                 'command': 'addDistributionMode',
                 'name': distribution_mode.label
             }
-            if scenarios := [
-                child for child in distribution_mode.getchildren() if isinstance(child, inkex.Layer)
-            ]:
-                command['scenarios'] = [scenario.label for scenario in scenarios]
+            if is_scenario_distribution(distribution_mode):
+                command['scenarios'] = [
+                    scenario.label for scenario in distribution_mode.getchildren()
+                ]
             commands.append(command)
         return commands
 
@@ -628,21 +628,25 @@ class WZMapBuilder(inkex.EffectExtension):
         :return:
         List of addTerritoryToDistribution commands
         """
-        distribution_mode_layers = self._get_metadata_type_layers(
-            MapLayers.DISTRIBUTION_MODES, is_recursive=False
-        )
-        # todo implement adding scenario distributions modes
-        #  determine if scenario distribution mode
-        #  get scenario names
-
-        commands = [
-            {
-                'command': 'addTerritoryToDistribution',
-                'id': get_territory_id(territory),
-                'distributionName': distribution_mode_layer.get(get_uri(Inkscape.LABEL))
-            } for distribution_mode_layer in distribution_mode_layers
-            for territory in distribution_mode_layer.xpath(f"./{Svg.CLONE}", namespaces=NSS)
-        ]
+        distribution_mode_layer = self._get_metadata_layer(MapLayers.DISTRIBUTION_MODES)
+        commands = []
+        for distribution_mode in distribution_mode_layer.getchildren():
+            if is_scenario_distribution(distribution_mode):
+                for scenario in distribution_mode.getchildren():
+                    for territory in scenario.getchildren():
+                        commands.append({
+                            'command': 'addTerritoryToDistribution',
+                            'id': get_territory_id(territory.href),
+                            'distributionName': distribution_mode.label,
+                            'scenario': scenario.label
+                        })
+            else:
+                for territory in distribution_mode.getchildren():
+                    commands.append({
+                        'command': 'addTerritoryToDistribution',
+                        'id': get_territory_id(territory.href),
+                        'distributionName': distribution_mode.label,
+                    })
         return commands
 
     ####################
