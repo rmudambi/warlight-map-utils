@@ -8,6 +8,10 @@
             <label>This extension enables a user to generate and upload Warzone map metadata.
                 <br/><br/>It endeavors to replace all the work that would need to be done in the
                 Warzone Map Editor, enabling users define their map entirely in the svg file.
+                <br/><br/>The best way to use this is to create a first version of the map (v0.0)
+                with no metadata in it. Duplicate that version creating v1.0, and when you are ready
+                to upload metadata upload it all to v1.0. If you want to upload additional changes,
+                you should always start by creating a new version by duplicating v0.0. 
             </label>
         </page>
         <page name="territories" gui-text="Territories">
